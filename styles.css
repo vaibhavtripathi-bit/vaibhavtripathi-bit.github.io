@@ -191,6 +191,18 @@ a {
   background: rgba(255, 255, 255, 0.08);
 }
 
+.button.resume {
+  color: var(--white);
+  background: var(--teal);
+  border: 1px solid var(--teal);
+}
+
+.button.resume.dark {
+  color: var(--white);
+  background: var(--teal-dark);
+  border-color: var(--teal-dark);
+}
+
 .section {
   padding: clamp(56px, 8vw, 108px) clamp(20px, 5vw, 72px);
 }

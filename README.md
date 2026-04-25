@@ -16,4 +16,6 @@ This repository is intended to be published as the account-level GitHub Pages si
 
 The site content is based on Vaibhav Tripathi's mobile architect resume.
 
-The public site intentionally omits the phone number and does not include the raw resume PDF.
+The public site includes a downloadable resume PDF at:
+
+`assets/Vaibhav_Tripathi_Mobile_Architect.pdf`
