@@ -73,7 +73,7 @@ a {
 .nav {
   display: flex;
   gap: clamp(14px, 3vw, 34px);
-  font-size: 0.92rem;
+  font-size: 0.96rem;
   font-weight: 600;
 }
 
@@ -97,7 +97,7 @@ a {
   background: var(--white);
   border: 1px solid var(--white);
   border-radius: 8px;
-  font-size: 0.9rem;
+  font-size: 0.96rem;
   font-weight: 800;
   text-decoration: none;
 }
@@ -139,7 +139,7 @@ a {
 .eyebrow {
   margin: 0 0 12px;
   color: var(--amber);
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   font-weight: 800;
   letter-spacing: 0;
   text-transform: uppercase;
@@ -165,6 +165,10 @@ a {
   display: block;
 }
 
+.heading-line {
+  display: inline;
+}
+
 .hero-lede {
   width: min(680px, 100%);
   margin: 22px 0 0;
@@ -188,6 +192,7 @@ a {
   min-height: 44px;
   padding: 11px 18px;
   border-radius: 8px;
+  font-size: 1rem;
   font-weight: 800;
   text-align: center;
   text-decoration: none;
@@ -269,58 +274,84 @@ a {
 .metric-card p {
   margin: 18px 0 0;
   color: var(--muted);
+  font-size: 1rem;
 }
 
 .profile-band {
   display: grid;
-  grid-template-columns: minmax(220px, 0.62fr) minmax(0, 1.38fr);
-  gap: clamp(32px, 7vw, 92px);
+  grid-template-columns: minmax(0, 1.28fr) minmax(320px, 0.72fr);
+  gap: clamp(28px, 6vw, 76px);
   align-items: center;
   color: var(--white);
-  background: var(--charcoal);
+  background:
+    linear-gradient(135deg, rgba(8, 117, 111, 0.18) 0%, rgba(7, 17, 17, 0) 42%),
+    var(--charcoal);
 }
 
-.profile-photo-panel {
+.profile-card {
   display: grid;
-  gap: 16px;
-  justify-items: start;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 20px;
+  align-items: center;
+  min-width: 0;
+  width: min(100%, 400px);
+  padding: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(8, 117, 111, 0.16) 100%),
+    rgba(255, 255, 255, 0.04);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.22);
 }
 
 .profile-photo {
   display: block;
-  width: min(100%, 280px);
-  aspect-ratio: 4 / 5;
+  width: 96px;
+  height: 96px;
   object-fit: cover;
-  object-position: center 12%;
-  border: 2px solid rgba(255, 255, 255, 0.88);
-  border-radius: 8px;
+  object-position: center 16%;
+  border: 3px solid rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
   background: var(--white);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.28);
 }
 
-.profile-caption {
+.profile-card-copy {
   display: grid;
-  gap: 2px;
+  gap: 5px;
+  min-width: 0;
   color: rgba(255, 255, 255, 0.78);
 }
 
-.profile-caption strong {
+.profile-card-copy strong {
   color: var(--white);
-  font-size: 1rem;
+  font-size: 1.28rem;
+  line-height: 1.15;
 }
 
-.profile-caption span {
-  font-size: 0.94rem;
+.profile-role {
+  color: var(--white);
+  font-size: 1.08rem;
+  font-weight: 800;
+}
+
+.profile-location {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 1rem;
 }
 
 .profile-band h2 {
   color: var(--white);
 }
 
+.profile-copy {
+  min-width: 0;
+}
+
 .profile-copy p:not(.eyebrow) {
   margin: 22px 0 0;
   color: rgba(255, 255, 255, 0.78);
-  font-size: 1.05rem;
+  font-size: 1.1rem;
 }
 
 .timeline {
@@ -345,7 +376,7 @@ a {
   align-content: start;
   gap: 8px;
   color: var(--muted);
-  font-size: 0.94rem;
+  font-size: 0.98rem;
 }
 
 .timeline-meta strong {
@@ -359,6 +390,7 @@ a {
 .timeline-content p {
   margin: 12px 0 0;
   color: var(--muted);
+  font-size: 1.02rem;
 }
 
 .split-section {
@@ -392,6 +424,7 @@ a {
 .skill-card p {
   margin: 10px 0 0;
   color: var(--muted);
+  font-size: 1.02rem;
 }
 
 .education-contact {
@@ -407,6 +440,7 @@ a {
 
 .education p:not(.eyebrow) {
   color: var(--muted);
+  font-size: 1.02rem;
 }
 
 .contact-card {
@@ -417,6 +451,7 @@ a {
 
 .contact-card p {
   color: var(--muted);
+  font-size: 1.02rem;
 }
 
 .contact-card .button.secondary {
@@ -486,13 +521,32 @@ a {
     position: static;
   }
 
-  .profile-photo-panel {
-    justify-items: center;
-    text-align: center;
+  .profile-card {
+    justify-self: start;
   }
 }
 
 @media (max-width: 560px) {
+  .section {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+
+  .section > *,
+  .section-heading,
+  .profile-copy,
+  .profile-card,
+  .metric-card,
+  .timeline,
+  .split-section > *,
+  .skill-groups,
+  .skill-card,
+  .education,
+  .contact-card {
+    width: 100%;
+    max-width: min(342px, calc(100vw - 48px));
+  }
+
   .hero-content {
     width: auto;
     max-width: 390px;
@@ -526,5 +580,62 @@ a {
 
   .metric-card {
     min-height: auto;
+  }
+
+  .section-heading,
+  .profile-copy {
+    max-width: min(342px, calc(100vw - 48px));
+  }
+
+  .section h2 {
+    font-size: 1.72rem;
+    overflow-wrap: break-word;
+  }
+
+  .profile-band {
+    overflow: hidden;
+  }
+
+  .profile-card {
+    grid-template-columns: 66px minmax(0, 1fr);
+    gap: 12px;
+    justify-self: stretch;
+    width: 100%;
+    max-width: min(342px, calc(100vw - 48px));
+    padding: 14px;
+  }
+
+  .profile-photo {
+    width: 66px;
+    height: 66px;
+  }
+
+  .profile-card-copy strong {
+    font-size: 1.12rem;
+  }
+
+  .profile-role {
+    font-size: 1rem;
+  }
+
+  .profile-location {
+    font-size: 0.94rem;
+  }
+
+  .profile-band h2 {
+    max-width: min(342px, calc(100vw - 48px));
+    font-size: 1.56rem;
+    line-height: 1.12;
+    overflow-wrap: break-word;
+  }
+
+  .heading-line {
+    display: block;
+  }
+
+  .profile-copy p:not(.eyebrow) {
+    max-width: min(342px, calc(100vw - 48px));
+    font-size: 1rem;
+    overflow-wrap: anywhere;
   }
 }
