@@ -51,6 +51,12 @@ a {
   backdrop-filter: blur(18px);
 }
 
+.header-links {
+  display: flex;
+  align-items: center;
+  gap: clamp(16px, 3vw, 34px);
+}
+
 .brand {
   display: inline-grid;
   width: 42px;
@@ -81,10 +87,25 @@ a {
   color: var(--white);
 }
 
+.header-resume {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 9px 16px;
+  color: var(--charcoal);
+  background: var(--white);
+  border: 1px solid var(--white);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
 .hero {
   position: relative;
   display: grid;
-  min-height: 82vh;
+  min-height: min(82vh, 940px);
   overflow: hidden;
   color: var(--white);
   background: var(--charcoal);
@@ -113,19 +134,6 @@ a {
   align-self: end;
   width: min(760px, 100%);
   padding: 128px clamp(20px, 5vw, 72px) 72px;
-}
-
-.hero-headshot {
-  display: block;
-  width: clamp(104px, 10vw, 144px);
-  height: clamp(104px, 10vw, 144px);
-  margin: 0 0 22px;
-  object-fit: cover;
-  object-position: center 18%;
-  border: 2px solid rgba(255, 255, 255, 0.82);
-  border-radius: 8px;
-  background: var(--white);
-  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.34);
 }
 
 .eyebrow {
@@ -265,18 +273,52 @@ a {
 
 .profile-band {
   display: grid;
-  grid-template-columns: 0.85fr 1.15fr;
-  gap: clamp(28px, 6vw, 88px);
+  grid-template-columns: minmax(220px, 0.62fr) minmax(0, 1.38fr);
+  gap: clamp(32px, 7vw, 92px);
+  align-items: center;
   color: var(--white);
   background: var(--charcoal);
+}
+
+.profile-photo-panel {
+  display: grid;
+  gap: 16px;
+  justify-items: start;
+}
+
+.profile-photo {
+  display: block;
+  width: min(100%, 280px);
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+  object-position: center 12%;
+  border: 2px solid rgba(255, 255, 255, 0.88);
+  border-radius: 8px;
+  background: var(--white);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.3);
+}
+
+.profile-caption {
+  display: grid;
+  gap: 2px;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.profile-caption strong {
+  color: var(--white);
+  font-size: 1rem;
+}
+
+.profile-caption span {
+  font-size: 0.94rem;
 }
 
 .profile-band h2 {
   color: var(--white);
 }
 
-.profile-band p:not(.eyebrow) {
-  margin: 0;
+.profile-copy p:not(.eyebrow) {
+  margin: 22px 0 0;
   color: rgba(255, 255, 255, 0.78);
   font-size: 1.05rem;
 }
@@ -393,17 +435,34 @@ a {
   margin: 0;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1100px) {
   .site-header {
-    position: absolute;
+    justify-content: flex-start;
+    gap: 16px;
   }
 
   .nav {
     display: none;
   }
 
+  .header-links {
+    margin-left: 0;
+  }
+
+  .header-resume {
+    min-width: 86px;
+    min-height: 38px;
+    padding: 8px 14px;
+  }
+}
+
+@media (max-width: 900px) {
+  .site-header {
+    position: absolute;
+  }
+
   .hero {
-    min-height: 86vh;
+    min-height: min(86vh, 900px);
   }
 
   .hero-content {
@@ -425,6 +484,11 @@ a {
 
   .sticky-heading {
     position: static;
+  }
+
+  .profile-photo-panel {
+    justify-items: center;
+    text-align: center;
   }
 }
 
