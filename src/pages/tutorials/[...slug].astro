@@ -12,14 +12,43 @@ export async function getStaticPaths() {
 }
 
 const { tutorial } = Astro.props;
-const { Content } = await render(tutorial);
-const { title, description, pubDate, updatedDate, category, topic, subtopic, heroImage } =
+const { title, description, pubDate, updatedDate, category, topic, subtopic, heroImage, richSlug } =
   tutorial.data;
 
 const catSlug = slugify(category);
 const topicSlug = slugify(topic);
 const dateFmt = (d: Date) =>
   d.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+
+// ── Rich (pre-built HTML) articles ──────────────────────────────────────────
+// Load all rich partials at build time; pick this article's if it has one.
+const richHtmls = import.meta.glob("../../content/rich/*.html", {
+  query: "?raw",
+  import: "default",
+  eager: true,
+}) as Record<string, string>;
+
+let richBody: string | null = null;
+let toc: { id: string; label: string }[] = [];
+
+if (richSlug) {
+  const key = Object.keys(richHtmls).find((k) => k.endsWith(`/${richSlug}.html`));
+  richBody = key ? richHtmls[key] : null;
+  if (richBody) {
+    // Build the Contents list from each <section id="…"><h2 class="sec">…</h2>.
+    const re = /<section id="([^"]+)">[\s\S]*?<h2 class="sec">([\s\S]*?)<\/h2>/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(richBody)) !== null) {
+      toc.push({ id: m[1], label: m[2].replace(/<[^>]+>/g, "").trim() });
+    }
+  }
+}
+
+// Normal Markdown articles render via <Content />.
+let Content: any = null;
+if (!richBody) {
+  ({ Content } = await render(tutorial));
+}
 ---
 
 <BaseLayout
@@ -29,34 +58,92 @@ const dateFmt = (d: Date) =>
   type="article"
   publishedDate={pubDate}
 >
-  <article class="article">
-    <header class="article-head">
-      <nav class="bc" aria-label="Breadcrumb">
-        <a href={`/topics/${catSlug}`}>{category}</a>
-        <span>›</span>
-        <a href={`/topics/${catSlug}/${topicSlug}`}>{topic}</a>
-        {subtopic && (
-          <>
-            <span>›</span>
-            <a href={`/topics/${catSlug}/${topicSlug}/${slugify(subtopic)}`}>{subtopic}</a>
-          </>
-        )}
-      </nav>
-      <h1>{title}</h1>
-      <div class="article-meta">
-        Published {dateFmt(pubDate)}
-        {updatedDate && <> · Updated {dateFmt(updatedDate)}</>}
+  {richBody ? (
+    <div class="rich-wrap">
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      />
+      <header class="rich-head">
+        <nav class="bc" aria-label="Breadcrumb">
+          <a href={`/topics/${catSlug}`}>{category}</a>
+          <span>›</span>
+          <a href={`/topics/${catSlug}/${topicSlug}`}>{topic}</a>
+          {subtopic && (
+            <>
+              <span>›</span>
+              <a href={`/topics/${catSlug}/${topicSlug}/${slugify(subtopic)}`}>{subtopic}</a>
+            </>
+          )}
+        </nav>
+        <h1>{title}</h1>
+        <p class="rich-standfirst">{description}</p>
+        <div class="article-meta">Published {dateFmt(pubDate)}{updatedDate && <> · Updated {dateFmt(updatedDate)}</>}</div>
+      </header>
+
+      <div class="rich-layout">
+        <aside class="rich-toc" aria-label="Contents">
+          <p class="rich-toc-title">Contents</p>
+          <ol>
+            {toc.map((s, i) => (
+              <li>
+                <a href={`#${s.id}`} data-toc={s.id}>
+                  <span class="toc-num">{String(i + 1).padStart(2, "0")}</span>
+                  {s.label}
+                </a>
+              </li>
+            ))}
+          </ol>
+        </aside>
+
+        <div class="rich-body" set:html={richBody}></div>
       </div>
-    </header>
 
-    <div class="ad-slot" data-ad-slot="article-top"></div>
-
-    <div class="prose">
-      <Content />
+      <p style="margin-top:48px"><a class="back-link" href="/tutorials">← All articles</a></p>
     </div>
+  ) : (
+    <article class="article">
+      <header class="article-head">
+        <nav class="bc" aria-label="Breadcrumb">
+          <a href={`/topics/${catSlug}`}>{category}</a>
+          <span>›</span>
+          <a href={`/topics/${catSlug}/${topicSlug}`}>{topic}</a>
+          {subtopic && (
+            <>
+              <span>›</span>
+              <a href={`/topics/${catSlug}/${topicSlug}/${slugify(subtopic)}`}>{subtopic}</a>
+            </>
+          )}
+        </nav>
+        <h1>{title}</h1>
+        <div class="article-meta">Published {dateFmt(pubDate)}{updatedDate && <> · Updated {dateFmt(updatedDate)}</>}</div>
+      </header>
 
-    <div class="ad-slot" data-ad-slot="article-bottom"></div>
+      <div class="ad-slot" data-ad-slot="article-top"></div>
+      <div class="prose"><Content /></div>
+      <div class="ad-slot" data-ad-slot="article-bottom"></div>
 
-    <p style="margin-top:40px"><a class="back-link" href="/tutorials">← All articles</a></p>
-  </article>
+      <p style="margin-top:40px"><a class="back-link" href="/tutorials">← All articles</a></p>
+    </article>
+  )}
 </BaseLayout>
+
+{richBody && (
+  <script>
+    // Scroll-spy: highlight the Contents link for the section in view.
+    const links = Array.from(document.querySelectorAll(".rich-toc a[data-toc]"));
+    const byId = new Map(links.map((a) => [a.getAttribute("data-toc"), a]));
+    const obs = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting) {
+            links.forEach((a) => a.classList.remove("active"));
+            byId.get(e.target.id)?.classList.add("active");
+          }
+        }
+      },
+      { rootMargin: "-20% 0px -70% 0px", threshold: 0 }
+    );
+    document.querySelectorAll(".rich-body section[id]").forEach((s) => obs.observe(s));
+  </script>
+)}

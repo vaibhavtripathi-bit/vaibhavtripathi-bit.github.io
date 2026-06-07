@@ -22,6 +22,11 @@ const tutorials = defineCollection({
     tags: z.array(z.string()).default([]),
     // Optional hero image path (relative to /public), used in social previews.
     heroImage: z.string().optional(),
+    // For rich pre-built HTML articles: the filename (without extension) of a
+    // partial in src/content/rich/. When set, the article page renders that
+    // HTML verbatim (preserving custom SVGs/diagrams) with a sticky contents
+    // sidebar, instead of the Markdown body.
+    richSlug: z.string().optional(),
     // Set to true to hide a work-in-progress article from listings & sitemap.
     draft: z.boolean().default(false),
   }),

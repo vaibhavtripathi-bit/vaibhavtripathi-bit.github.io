@@ -23,7 +23,7 @@ export const TAXONOMY = [
   {
     name: "Mobile",
     topics: [
-      { name: "Android", subs: ["Performance", "Jetpack Compose", "Networking", "Testing"] },
+      { name: "Android", subs: ["UI", "Performance", "Jetpack Compose", "Networking", "Testing"] },
       { name: "iOS", subs: ["SwiftUI", "Concurrency", "UIKit"] },
       { name: "Kotlin", subs: ["Coroutines", "Flow"] },
       { name: "Swift", subs: [] },

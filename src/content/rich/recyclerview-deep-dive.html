@@ -1,0 +1,689 @@
+  <!-- ============ 1. PROBLEM ============ -->
+  <section id="problem">
+    <span class="sec-num">Section 01</span>
+    <h2 class="sec">Why RecyclerView exists at all</h2>
+    <p>One problem sits underneath everything. Imagine a list of <strong>100,000 messages</strong>. A <code>View</code> in Android is <strong>expensive</strong> — a real object with layout, measurements, draw commands, and memory. Creating one means inflating XML, calling <code>findViewById</code>, measuring, and positioning. Doing that 100,000 times would exhaust memory and kill the app.</p>
+    <p>But the screen only shows <strong>~8 rows at a time.</strong> So the whole design rests on a <strong>separation</strong>:</p>
+    <ul>
+      <li>Your <strong>data</strong> (100,000 items) lives in a plain list — cheap, just objects in memory.</li>
+      <li>Your <strong>Views</strong> (the expensive things) are created <em>only for what's visible</em>, plus a tiny buffer.</li>
+    </ul>
+
+    <figure>
+      <svg viewBox="0 0 880 360" xmlns="http://www.w3.org/2000/svg" font-family="JetBrains Mono, monospace">
+        <text x="30" y="34" font-family="Fraunces, serif" font-size="19" font-weight="600" fill="#1a1714">Data is cheap · Views are expensive</text>
+        <!-- DATA -->
+        <text x="30" y="68" font-size="12" fill="#8a8278" letter-spacing="1">DATA  (cheap — just objects)</text>
+        <rect x="30" y="80" width="200" height="240" rx="4" fill="#faf7f2" stroke="#d4c9b6"/>
+        <g font-size="12.5" fill="#4a443d">
+          <text x="48" y="108">Item 0</text><text x="48" y="132">Item 1</text>
+          <text x="48" y="156">Item 2</text><text x="48" y="180">Item 3</text>
+          <text x="48" y="204">Item 4</text><text x="48" y="228">…</text>
+          <text x="48" y="252">Item 99,998</text><text x="48" y="276">Item 99,999</text>
+        </g>
+        <text x="48" y="306" font-size="11" fill="#8a8278">100,000 entries, almost free</text>
+        <!-- arrows -->
+        <g stroke="#b5341f" stroke-width="1.5" fill="none">
+          <path d="M232 112 L300 132" marker-end="url(#ar)"/>
+          <path d="M232 136 L300 168" marker-end="url(#ar)"/>
+          <path d="M232 160 L300 204" marker-end="url(#ar)"/>
+          <path d="M232 184 L300 240" marker-end="url(#ar)"/>
+        </g>
+        <defs><marker id="ar" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto">
+          <path d="M0,0 L8,4 L0,8 z" fill="#b5341f"/></marker></defs>
+        <!-- SCREEN -->
+        <text x="320" y="68" font-size="12" fill="#8a8278" letter-spacing="1">SCREEN  (expensive Views — only visible ones)</text>
+        <rect x="320" y="80" width="240" height="240" rx="4" fill="#eef4f8" stroke="#1f5d8c" stroke-width="2"/>
+        <g>
+          <rect x="334" y="120" width="212" height="34" rx="3" fill="#1f5d8c"/><text x="346" y="142" font-size="12" fill="#fff">View A → Item 0</text>
+          <rect x="334" y="160" width="212" height="34" rx="3" fill="#1f5d8c"/><text x="346" y="182" font-size="12" fill="#fff">View B → Item 1</text>
+          <rect x="334" y="200" width="212" height="34" rx="3" fill="#1f5d8c"/><text x="346" y="222" font-size="12" fill="#fff">View C → Item 2</text>
+          <rect x="334" y="240" width="212" height="34" rx="3" fill="#1f5d8c"/><text x="346" y="262" font-size="12" fill="#fff">View D → Item 3</text>
+        </g>
+        <text x="346" y="300" font-size="11" fill="#1f5d8c">Only ~5–12 Views ever exist.</text>
+        <!-- recycle note -->
+        <text x="600" y="150" font-size="40" fill="#b5341f">↺</text>
+        <text x="600" y="200" font-size="12.5" fill="#4a443d">When a row scrolls off,</text>
+        <text x="600" y="220" font-size="12.5" fill="#4a443d">its View is <tspan font-weight="600" fill="#b5341f">reused</tspan> for</text>
+        <text x="600" y="240" font-size="12.5" fill="#4a443d">the row scrolling in.</text>
+      </svg>
+      <figcaption>Fig 1 · The core separation that names the whole component</figcaption>
+    </figure>
+
+    <p>The magic move: when you scroll and Item 0 disappears off the top while Item 8 appears at the bottom, View A is <strong>not destroyed</strong> (that wastes the object) and does <strong>not stay on screen</strong> (it isn't visible). Instead — <strong>take View A, wipe its old data, put Item 8's data into it, and move it to the bottom.</strong> Same object, new content.</p>
+    <div class="summary"><strong>That one move is the entire reason the component is called RecyclerView.</strong> Every part that follows — ViewHolder, Adapter, the pool — exists to make that move clean and fast.</div>
+  </section>
+
+  <!-- ============ 2. COSTS ============ -->
+  <section id="costs">
+    <span class="sec-num">Section 02</span>
+    <h2 class="sec">The three costs — and what recycling actually kills</h2>
+    <p>Creating a fresh view involves <strong>three separate costs</strong>, and they have very different lifecycles. The crucial insight: recycling kills <em>inflation</em>, but <strong>not</strong> measure and layout.</p>
+
+    <figure>
+      <svg viewBox="0 0 880 240" xmlns="http://www.w3.org/2000/svg" font-family="JetBrains Mono, monospace">
+        <rect x="40" y="30" width="800" height="52" rx="4" fill="#fbf3f1" stroke="#e9c9c0"/>
+        <text x="60" y="55" font-size="14" font-weight="600" fill="#b5341f">1 · INFLATE</text>
+        <text x="220" y="55" font-size="13" fill="#4a443d">XML → View tree, findViewById, allocate</text>
+        <text x="620" y="55" font-size="12.5" font-weight="600" fill="#2e7d4f">✓ killed by recycling</text>
+
+        <rect x="40" y="92" width="800" height="52" rx="4" fill="#fdf6e8" stroke="#ecd9a8"/>
+        <text x="60" y="117" font-size="14" font-weight="600" fill="#c98a16">2 · MEASURE</text>
+        <text x="220" y="117" font-size="13" fill="#4a443d">how big is each child? (onMeasure)</text>
+        <text x="600" y="117" font-size="12.5" font-weight="600" fill="#b5341f">✗ NOT killed</text>
+
+        <rect x="40" y="154" width="800" height="52" rx="4" fill="#fdf6e8" stroke="#ecd9a8"/>
+        <text x="60" y="179" font-size="14" font-weight="600" fill="#c98a16">3 · LAYOUT</text>
+        <text x="220" y="179" font-size="13" fill="#4a443d">where does each child go? (onLayout)</text>
+        <text x="600" y="179" font-size="12.5" font-weight="600" fill="#b5341f">✗ NOT killed</text>
+      </svg>
+      <figcaption>Fig 2 · Recycling reuses the object from step 1; steps 2 &amp; 3 still run on rebind</figcaption>
+    </figure>
+
+    <p>Recycling reuses the <em>object</em> from step 1. But when you rebind it with new data and put it back on screen, it must go through 2 and 3 again — because the new data may change the size (a 3-line comment row is taller than a 1-line one). <strong>Recycling is not "free re-display." It is "skip inflation, still pay layout."</strong></p>
+
+    <div class="box warn">
+      <span class="lab">The two-pass measure trap</span>
+      <p><code>LinearLayout</code> with <code>layout_weight</code> measures its children <strong>twice</strong>; <code>RelativeLayout</code> also does two passes by design. Nest them and passes multiply: 2 × 2 = 4 measure passes per bind, per row, on every scroll frame. This is the <strong>#1 real-world jank cause</strong>, and it has nothing to do with recycling working. Fix: flatten with <code>ConstraintLayout</code> (single-pass for most cases) or <code>merge</code> tags. The recycler cannot save you from a bad hierarchy.</p>
+    </div>
+  </section>
+
+  <!-- ============ 3. PARKING LOTS ============ -->
+  <section id="parking">
+    <span class="sec-num">Section 03</span>
+    <h2 class="sec">The three parking lots</h2>
+    <p>When a row scrolls off, its View is reused — but where does it live <em>between</em> scrolling off and being reused? It is not destroyed and not on screen. It is <strong>parked</strong> — held in memory, detached from the screen, waiting. That parking spot is what all the jargon (scrap, cache, pool) means. They are just <strong>different parking lots for off-screen Views</strong>, differing in one thing: <em>how much work it takes to put the View back on screen.</em></p>
+
+    <figure>
+      <svg viewBox="0 0 880 200" xmlns="http://www.w3.org/2000/svg" font-family="JetBrains Mono, monospace">
+        <rect x="30" y="60" width="170" height="80" rx="5" fill="#eef4f8" stroke="#1f5d8c" stroke-width="1.5"/>
+        <text x="115" y="92" font-size="13" font-weight="600" fill="#1f5d8c" text-anchor="middle">ON SCREEN</text>
+        <text x="115" y="114" font-size="11.5" fill="#4a443d" text-anchor="middle">View shows Item 2</text>
+
+        <rect x="355" y="50" width="200" height="100" rx="5" fill="#faf7f2" stroke="#d4c9b6" stroke-width="1.5"/>
+        <text x="455" y="86" font-size="13" font-weight="600" fill="#b5341f" text-anchor="middle">OFF SCREEN</text>
+        <text x="455" y="108" font-size="11.5" fill="#4a443d" text-anchor="middle">detached, held in</text>
+        <text x="455" y="124" font-size="11.5" fill="#4a443d" text-anchor="middle">memory, waiting</text>
+        <text x="455" y="178" font-size="11" fill="#8a8278" text-anchor="middle">↑ scrap / cache / pool all live here</text>
+
+        <rect x="700" y="60" width="170" height="80" rx="5" fill="#eef6f0" stroke="#2e7d4f" stroke-width="1.5"/>
+        <text x="785" y="92" font-size="13" font-weight="600" fill="#2e7d4f" text-anchor="middle">BACK ON SCREEN</text>
+        <text x="785" y="114" font-size="11.5" fill="#4a443d" text-anchor="middle">View shows Item 9</text>
+
+        <g stroke="#8a8278" stroke-width="1.5" fill="none">
+          <path d="M200 100 L350 100" marker-end="url(#ar2)"/>
+          <path d="M555 100 L695 100" marker-end="url(#ar2)"/>
+        </g>
+        <text x="275" y="92" font-size="10.5" fill="#8a8278" text-anchor="middle">scroll</text>
+        <text x="625" y="92" font-size="10.5" fill="#8a8278" text-anchor="middle">scroll</text>
+        <defs><marker id="ar2" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto">
+          <path d="M0,0 L8,4 L0,8 z" fill="#8a8278"/></marker></defs>
+      </svg>
+      <figcaption>Fig 3 · The waiting area is the entire concept behind scrap / cache / pool</figcaption>
+    </figure>
+
+    <p>A View needs up to three things before it can show again: <strong>inflate</strong> (done once, never again for a reused View), <strong>bind</strong> (put data in — your <code>onBindViewHolder</code>), and <strong>measure + layout</strong> (size and position). Different parking lots <em>remember different amounts</em>, so a View pulled from them needs different re-work. That is the <em>only</em> reason there are three.</p>
+
+    <table>
+      <thead><tr><th>Parking lot</th><th>What it remembers</th><th>Work to reuse</th></tr></thead>
+      <tbody>
+        <tr><td><strong>1. Scrap</strong><br>(very short term)</td><td>everything, briefly (used mid-layout)</td><td>almost nothing</td></tr>
+        <tr><td><strong>2. Cache</strong><br>(short term, default 2)</td><td>which item it showed + its data</td><td>nothing to re-bind if you return to that same item</td></tr>
+        <tr><td><strong>3. Pool</strong><br>(long term, default 5/type)</td><td>only "what type it is" — data wiped</td><td>must <strong>re-bind</strong> + re-measure/layout</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ============ 4. SEARCH ============ -->
+  <section id="search">
+    <span class="sec-num">Section 04</span>
+    <h2 class="sec">The cheapest-first search</h2>
+    <p><code>Recycler.getViewForPosition(N)</code> is simply the function that says <em>"I need a View for row N — go find me one."</em> It checks the parking lots <strong>in order, cheapest first</strong>, and only inflates a brand-new View as the last resort.</p>
+
+    <figure>
+      <svg viewBox="0 0 880 320" xmlns="http://www.w3.org/2000/svg" font-family="JetBrains Mono, monospace">
+        <rect x="320" y="20" width="240" height="40" rx="20" fill="#1f1b17"/>
+        <text x="440" y="45" font-size="13" fill="#ece5d8" text-anchor="middle">"I need a View for row 9"</text>
+        <line x1="440" y1="60" x2="440" y2="78" stroke="#8a8278" stroke-width="1.5"/>
+
+        <!-- scrap -->
+        <rect x="120" y="80" width="640" height="42" rx="4" fill="#faf7f2" stroke="#1f5d8c"/>
+        <text x="140" y="106" font-size="13" font-weight="600" fill="#1f5d8c">① Check SCRAP</text>
+        <text x="320" y="106" font-size="12" fill="#4a443d">fits? → use as-is (cheapest, no rebind)</text>
+        <text x="700" y="106" font-size="11" fill="#8a8278" text-anchor="end">no ↓</text>
+
+        <rect x="120" y="132" width="640" height="42" rx="4" fill="#eef6f0" stroke="#2e7d4f"/>
+        <text x="140" y="158" font-size="13" font-weight="600" fill="#2e7d4f">② Check CACHE</text>
+        <text x="320" y="158" font-size="12" fill="#4a443d">is row 9 still parked? → reuse, NO rebind</text>
+        <text x="700" y="158" font-size="11" fill="#8a8278" text-anchor="end">no ↓</text>
+
+        <rect x="120" y="184" width="640" height="42" rx="4" fill="#fbf3f1" stroke="#b5341f"/>
+        <text x="140" y="210" font-size="13" font-weight="600" fill="#b5341f">③ Check POOL</text>
+        <text x="320" y="210" font-size="12" fill="#4a443d">right type? → <tspan font-weight="600">REBIND</tspan> it for row 9</text>
+        <text x="700" y="210" font-size="11" fill="#8a8278" text-anchor="end">no ↓</text>
+
+        <rect x="120" y="236" width="640" height="48" rx="4" fill="#fdf6e8" stroke="#c98a16" stroke-width="1.5"/>
+        <text x="140" y="259" font-size="13" font-weight="600" fill="#c98a16">④ INFLATE a brand-new one</text>
+        <text x="320" y="259" font-size="12" fill="#4a443d">onCreateViewHolder — most expensive</text>
+        <text x="140" y="277" font-size="11" fill="#8a8278">↑ last resort only</text>
+      </svg>
+      <figcaption>Fig 4 · The function walks the lots cheapest → most expensive</figcaption>
+    </figure>
+
+    <p>Below is the skeleton of the real internal code (you never write this — it lives inside the framework's <code>Recycler</code> class and calls <em>into</em> your Adapter):</p>
+
+    <pre><code><span class="tok-cmt">// Inside RecyclerView.Recycler — framework code, NOT yours.</span>
+<span class="tok-key">View</span> <span class="tok-fn">getViewForPosition</span>(<span class="tok-key">int</span> position) {   <span class="tok-cmt">// position = 9</span>
+
+    <span class="tok-cmt">// ── ① SCRAP — detached during THIS layout pass</span>
+    ViewHolder holder = <span class="tok-fn">getScrapViewForPosition</span>(position);
+    <span class="tok-key">if</span> (holder != null) <span class="tok-key">return</span> holder.itemView;   <span class="tok-cmt">// no rebind</span>
+
+    <span class="tok-cmt">// ── ② CACHE — remembers which position it held</span>
+    holder = <span class="tok-fn">getCachedView</span>(position);
+    <span class="tok-key">if</span> (holder != null) <span class="tok-key">return</span> holder.itemView;   <span class="tok-cmt">// same item → no rebind</span>
+
+    <span class="tok-cmt">// ── ③ POOL — knows only the view TYPE</span>
+    <span class="tok-key">int</span> type = adapter.<span class="tok-fn">getItemViewType</span>(position);     <span class="tok-cmt">// ← YOUR code</span>
+    holder = pool.<span class="tok-fn">getRecycledView</span>(type);
+
+    <span class="tok-cmt">// ── ④ nothing anywhere → INFLATE</span>
+    <span class="tok-key">if</span> (holder == null)
+        holder = adapter.<span class="tok-fn">createViewHolder</span>(parent, type); <span class="tok-cmt">// ← onCreateViewHolder</span>
+
+    <span class="tok-cmt">// POOL + INFLATE paths BOTH still need data:</span>
+    adapter.<span class="tok-fn">bindViewHolder</span>(holder, position);          <span class="tok-cmt">// ← onBindViewHolder</span>
+    <span class="tok-key">return</span> holder.itemView;
+}</code></pre>
+
+    <div class="box key">
+      <span class="lab">Read this off the code</span>
+      <p>Scrap and cache <code>return</code> early — they <strong>skip <code>onBindViewHolder</code></strong>. Pool and inflate fall through to the bind call. That is <em>why</em> a pooled view costs a rebind and a cached view does not.</p>
+    </div>
+  </section>
+
+  <!-- ============ 5. VIEWHOLDER ============ -->
+  <section id="viewholder">
+    <span class="sec-num">Section 05</span>
+    <h2 class="sec">The ViewHolder — a cache for <code>findViewById</code></h2>
+    <p><code>findViewById</code> is not free — it <strong>walks the view tree</strong> searching for a matching id, every call. And <code>onBindViewHolder</code> runs on <em>every recycled row, constantly, during scroll.</em> Calling <code>findViewById</code> inside bind would mean dozens of tree-walks per second → jank.</p>
+    <p>The ViewHolder's job: <strong>do all the <code>findViewById</code> calls once</strong>, when the View is first inflated, and remember the results.</p>
+
+    <pre><code><span class="tok-key">class</span> <span class="tok-fn">VH</span>(view: View) : RecyclerView.ViewHolder(view) {
+    <span class="tok-key">val</span> text: TextView = view.<span class="tok-fn">findViewById</span>(R.id.message_text)
+    <span class="tok-cmt">//  ▲ runs ONCE in the constructor (= onCreateViewHolder,</span>
+    <span class="tok-cmt">//    the expensive inflate path). Stored in `text` forever.</span>
+}
+
+<span class="tok-key">override fun</span> <span class="tok-fn">onBindViewHolder</span>(holder: VH, position: Int) {
+    holder.text.text = items[position].body
+    <span class="tok-cmt">//     ▲ NO findViewById — just reach into the stored ref. Instant.</span>
+}</code></pre>
+
+    <figure>
+      <svg viewBox="0 0 880 150" xmlns="http://www.w3.org/2000/svg" font-family="JetBrains Mono, monospace">
+        <rect x="40" y="40" width="360" height="70" rx="5" fill="#fdf6e8" stroke="#c98a16"/>
+        <text x="220" y="68" font-size="13" font-weight="600" fill="#c98a16" text-anchor="middle">onCreateViewHolder  (RARE)</text>
+        <text x="220" y="92" font-size="11.5" fill="#4a443d" text-anchor="middle">inflate + findViewById ONCE → store refs</text>
+
+        <rect x="480" y="40" width="360" height="70" rx="5" fill="#eef6f0" stroke="#2e7d4f"/>
+        <text x="660" y="68" font-size="13" font-weight="600" fill="#2e7d4f" text-anchor="middle">onBindViewHolder  (OFTEN)</text>
+        <text x="660" y="92" font-size="11.5" fill="#4a443d" text-anchor="middle">reuse stored refs, just set data</text>
+
+        <path d="M400 75 L476 75" stroke="#8a8278" stroke-width="1.5" fill="none" marker-end="url(#ar3)"/>
+        <defs><marker id="ar3" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto">
+          <path d="M0,0 L8,4 L0,8 z" fill="#8a8278"/></marker></defs>
+      </svg>
+      <figcaption>Fig 5 · Find once, reuse forever</figcaption>
+    </figure>
+
+    <div class="summary">The recycling machinery moves <strong>ViewHolders</strong> around the parking lots — not raw Views — precisely because the ViewHolder carries those cached <code>findViewById</code> references along with its View. When a View is reused, its pre-found sub-view references come along for free. The ViewHolder also tracks its current position and flags, which is how the scrap/cache lookup knows "this parked holder was showing position 9."</div>
+  </section>
+
+  <!-- ============ 6. TRACE ============ -->
+  <section id="trace">
+    <span class="sec-num">Section 06</span>
+    <h2 class="sec">A concrete scroll, traced</h2>
+    <p>Setup: a screen that fits <strong>4 rows</strong>; the cache holds <strong>2</strong> by default. Watch which path each call takes.</p>
+
+    <h4>Phase A — Startup (all lots empty)</h4>
+    <pre><code>Need row 0 → scrap? empty · cache? empty · pool? empty
+           → INFLATE (onCreateViewHolder) + bind
+Need row 1 → all empty → INFLATE + bind
+Need row 2 → all empty → INFLATE + bind
+Need row 3 → all empty → INFLATE + bind
+
+Result: 4 × onCreateViewHolder, 4 × onBindViewHolder.
+Screen now shows VH-0, VH-1, VH-2, VH-3.</code></pre>
+    <p>This is the <em>only</em> time you see a burst of <code>onCreateViewHolder</code> — nothing exists to reuse yet.</p>
+
+    <h4>Phase B — Scroll down: row 0 leaves the top, rows enter at the bottom</h4>
+    <pre><code><span class="tok-cmt">Step 1 — row 0 scrolls off → parked in CACHE (remembers "held position 0")</span>
+   Screen: VH-1, VH-2, VH-3, [gap]
+   Cache:  [ VH-0 (was pos 0, data intact) ]
+
+<span class="tok-cmt">Step 2 — row 4 needs a view</span>
+   scrap? empty · cache? has VH-0 but it remembers POS 0, not 4 → no match
+   pool? empty → INFLATE VH-4 + bind     <span class="tok-cmt">(first scroll still inflates!)</span>
+
+<span class="tok-cmt">Step 3 — row 1 also leaves; cache is full (max 2) → oldest (VH-0) evicted to POOL</span>
+   Cache: [ VH-1 (pos 1) , … ]
+   Pool:  [ VH-0 (type=message, data WIPED) ]   <span class="tok-arrow">← ready to be rebound</span>
+
+<span class="tok-cmt">Step 4 — row 5 needs a view</span>
+   pool? YES — VH-0 sits there, right type!
+   → REUSE VH-0, onBindViewHolder(VH-0, 5). NO inflate, NO findViewById.
+   <span class="tok-arrow">★ THAT is the recycle.</span>
+
+<span class="tok-cmt">Step 5 — scroll BACK up; VH-1 still in cache holding position 1</span>
+   cache? YES → reuse, NO onBindViewHolder at all (data never wiped).
+   <span class="tok-arrow">★ why scrolling back is smoother than scrolling into fresh territory.</span></code></pre>
+
+    <figure>
+      <svg viewBox="0 0 880 160" xmlns="http://www.w3.org/2000/svg" font-family="JetBrains Mono, monospace">
+        <text x="30" y="30" font-size="12" fill="#8a8278">CALL FREQUENCY over a scroll session</text>
+        <text x="30" y="66" font-size="12" fill="#c98a16" font-weight="600">onCreateViewHolder</text>
+        <rect x="210" y="54" width="70" height="16" fill="#c98a16"/>
+        <text x="300" y="66" font-size="11" fill="#8a8278">· · ·  (almost never again)</text>
+        <text x="30" y="104" font-size="12" fill="#2e7d4f" font-weight="600">onBindViewHolder</text>
+        <rect x="210" y="92" width="70" height="16" fill="#2e7d4f"/>
+        <g fill="#2e7d4f">
+          <rect x="330" y="92" width="22" height="16"/><rect x="360" y="92" width="22" height="16"/>
+          <rect x="390" y="92" width="22" height="16"/><rect x="420" y="92" width="22" height="16"/>
+          <rect x="450" y="92" width="22" height="16"/><rect x="480" y="92" width="22" height="16"/>
+          <rect x="510" y="92" width="22" height="16"/><rect x="540" y="92" width="22" height="16"/>
+        </g>
+        <text x="245" y="134" font-size="10.5" fill="#8a8278" text-anchor="middle">startup</text>
+        <text x="440" y="134" font-size="10.5" fill="#8a8278" text-anchor="middle">steady scrolling (every pool reuse)</text>
+      </svg>
+      <figcaption>Fig 6 · onCreateViewHolder is rare; onBindViewHolder is hot — keep it light</figcaption>
+    </figure>
+  </section>
+
+  <!-- ============ 7. SCRAP ============ -->
+  <section id="scrap">
+    <span class="sec-num">Section 07</span>
+    <h2 class="sec">When scrap is actually used</h2>
+    <p>Scrap never appeared in the scroll trace — and that is not an accident. <strong>Cache and pool answer "what scrolled off?" Scrap answers "what stayed, while the layout was rebuilt?"</strong> Scrap fires during an in-place re-layout, when items <em>don't</em> move off screen but the layout is recomputed — classically triggered by <code>notifyItemChanged</code>.</p>
+
+    <h4>Example — change item 2's text while rows 0–3 are on screen</h4>
+    <pre><code>items[2].body = <span class="tok-str">"edited!"</span>
+adapter.<span class="tok-fn">notifyItemChanged</span>(2)
+
+<span class="tok-cmt">Step 1 — DETACH all visible children into SCRAP (this pass only)</span>
+   Scrap: [ VH-0(p0), VH-1(p1), VH-2(p2), VH-3(p3) ]  (positions + data kept)
+
+<span class="tok-cmt">Step 2 — RE-LAYOUT: getViewForPosition checks SCRAP first</span>
+   pos 0 → VH-0 clean  → re-attach, NO rebind
+   pos 1 → VH-1 clean  → re-attach, NO rebind
+   pos 2 → VH-2 DIRTY  → re-attach + onBindViewHolder(VH-2, 2)  ← only this one
+   pos 3 → VH-3 clean  → re-attach, NO rebind</code></pre>
+    <p>Without scrap, that one <code>notifyItemChanged(2)</code> might needlessly rebind all four visible rows. With scrap, three skip bind entirely. Internally there are two bins: <code>mAttachedScrap</code> (clean, coming back unchanged) and <code>mChangedScrap</code> (dirty, needs rebind).</p>
+
+    <div class="box note">
+      <span class="lab">The other reason scrap exists — predictive animations</span>
+      <p>On <code>notifyItemRemoved(1)</code>, RecyclerView animates row 1 sliding out while rows below slide up. To animate it needs the <em>old</em> and <em>new</em> layout simultaneously, so it runs <strong>two layout passes</strong> and scrap holds the holders between them so the animator can interpolate. Cache/pool are about views that have <em>left</em>; scrap is the only one that holds views <em>staying on screen through a change.</em></p>
+    </div>
+
+    <figure>
+      <svg viewBox="0 0 880 150" xmlns="http://www.w3.org/2000/svg" font-family="JetBrains Mono, monospace">
+        <text x="30" y="30" font-size="12" fill="#8a8278">LIFETIME — shortest → longest · views flow toward longer storage</text>
+        <rect x="60" y="55" width="180" height="62" rx="5" fill="#faf7f2" stroke="#1f5d8c"/>
+        <text x="150" y="82" font-size="13" font-weight="600" fill="#1f5d8c" text-anchor="middle">SCRAP</text>
+        <text x="150" y="102" font-size="11" fill="#4a443d" text-anchor="middle">1 layout pass · no rebind*</text>
+
+        <rect x="350" y="55" width="180" height="62" rx="5" fill="#eef6f0" stroke="#2e7d4f"/>
+        <text x="440" y="82" font-size="13" font-weight="600" fill="#2e7d4f" text-anchor="middle">CACHE</text>
+        <text x="440" y="102" font-size="11" fill="#4a443d" text-anchor="middle">recent, default 2 · no rebind</text>
+
+        <rect x="640" y="55" width="180" height="62" rx="5" fill="#fbf3f1" stroke="#b5341f"/>
+        <text x="730" y="82" font-size="13" font-weight="600" fill="#b5341f" text-anchor="middle">POOL</text>
+        <text x="730" y="102" font-size="11" fill="#4a443d" text-anchor="middle">session, 5/type · MUST rebind</text>
+
+        <g stroke="#8a8278" stroke-width="1.5" fill="none">
+          <path d="M240 86 L346 86" marker-end="url(#ar4)"/>
+          <path d="M530 86 L636 86" marker-end="url(#ar4)"/>
+        </g>
+        <defs><marker id="ar4" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto">
+          <path d="M0,0 L8,4 L0,8 z" fill="#8a8278"/></marker></defs>
+        <text x="30" y="140" font-size="10.5" fill="#8a8278">* unless the item is marked dirty</text>
+      </svg>
+      <figcaption>Fig 7 · The complete recycling hierarchy on one line</figcaption>
+    </figure>
+  </section>
+
+  <!-- ============ 8. LEVERS ============ -->
+  <section id="levers">
+    <span class="sec-num">Section 08</span>
+    <h2 class="sec">The four practical levers</h2>
+
+    <h3>Lever 1 · <code>setItemViewCacheSize(n)</code> — resize the "recently seen" shelf</h3>
+    <p>Changes how many recently-scrolled-off holders the <strong>cache</strong> keeps <em>with data intact</em> (default 2). Bigger cache = fewer rebinds when the user <strong>reverses direction</strong>; the cost is holding more live, invisible Views in memory.</p>
+    <pre><code>recyclerView.<span class="tok-fn">setItemViewCacheSize</span>(10)   <span class="tok-cmt">// default is 2</span></code></pre>
+    <div class="box win">
+      <span class="lab">When to raise it</span>
+      <p>Rarely, and only with a measured reason: a carousel users flick back and forth over, or rows with unavoidably costly binds. <strong>Do not</strong> crank it on a long forward-scrolling feed — forward scroll never touches the cache, so you just burn memory. Evicted cache views fall through into the pool.</p>
+    </div>
+
+    <h3>Lever 2 · <code>setHasFixedSize(true)</code> — a promise about the RV's <em>own</em> size</h3>
+    <p>The most misread one. It does <strong>not</strong> mean rows are the same height. It means <em>the RecyclerView's width/height will not change when items are added/removed/changed.</em> True when the RV is <code>match_parent</code> or a fixed <code>dp</code>; it then skips a full self-remeasure (and possible parent relayout) on every item change and does a light local update instead.</p>
+    <pre><code><span class="tok-cmt">// height NOT dependent on contents → safe to promise</span>
+&lt;RecyclerView android:layout_height=<span class="tok-str">"match_parent"</span> /&gt;
+recyclerView.<span class="tok-fn">setHasFixedSize</span>(true)</code></pre>
+    <table>
+      <thead><tr><th>RecyclerView height</th><th>Setting</th></tr></thead>
+      <tbody>
+        <tr><td><code>match_parent</code> / fixed dp</td><td><code>setHasFixedSize(true)</code> ✓</td></tr>
+        <tr><td><code>wrap_content</code> (size depends on contents)</td><td>must stay <code>false</code> ✗ — else visual bugs</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Lever 3 · Scrap vs. pool lifetimes</h3>
+    <p>The axis is <strong>how long the holder lives there.</strong> Scrap = one layout pass (a scratchpad, not tunable, not exposed to you). Pool = the whole session (tunable via <code>pool.setMaxRecycledViews(type, n)</code>, default 5/type; inspectable; shareable). Flow direction: scrap can drain into the pool when a re-layout ends and a holder is no longer needed on screen.</p>
+
+    <h3>Lever 4 · Share one <code>RecycledViewPool</code> across nested lists</h3>
+    <p>The most valuable in real apps. A vertical feed where each row is a horizontal carousel of identical cards: <strong>each RecyclerView has its own private pool by default</strong>, so as you scroll the outer list, every new carousel re-inflates its cards from scratch — defeating recycling.</p>
+    <figure>
+      <svg viewBox="0 0 880 230" xmlns="http://www.w3.org/2000/svg" font-family="JetBrains Mono, monospace">
+        <text x="30" y="26" font-size="12" fill="#8a8278">OUTER vertical RV · each row = an inner horizontal RV of identical cards</text>
+        <g>
+          <rect x="40" y="42" width="800" height="50" rx="4" fill="#faf7f2" stroke="#d4c9b6"/>
+          <text x="56" y="62" font-size="11.5" fill="#4a443d">"Trending"</text>
+          <rect x="56" y="68" width="40" height="18" fill="#1f5d8c"/><rect x="104" y="68" width="40" height="18" fill="#1f5d8c"/>
+          <rect x="152" y="68" width="40" height="18" fill="#1f5d8c"/><rect x="200" y="68" width="40" height="18" fill="#1f5d8c"/>
+          <text x="260" y="82" font-size="11" fill="#8a8278">→ swipe</text>
+
+          <rect x="40" y="98" width="800" height="50" rx="4" fill="#faf7f2" stroke="#d4c9b6"/>
+          <text x="56" y="118" font-size="11.5" fill="#4a443d">"New Releases"</text>
+          <rect x="56" y="124" width="40" height="18" fill="#1f5d8c"/><rect x="104" y="124" width="40" height="18" fill="#1f5d8c"/>
+          <rect x="152" y="124" width="40" height="18" fill="#1f5d8c"/><rect x="200" y="124" width="40" height="18" fill="#1f5d8c"/>
+
+          <rect x="40" y="154" width="800" height="50" rx="4" fill="#faf7f2" stroke="#d4c9b6"/>
+          <text x="56" y="174" font-size="11.5" fill="#4a443d">"Because you watched X"</text>
+          <rect x="56" y="180" width="40" height="18" fill="#1f5d8c"/><rect x="104" y="180" width="40" height="18" fill="#1f5d8c"/>
+          <rect x="152" y="180" width="40" height="18" fill="#1f5d8c"/><rect x="200" y="180" width="40" height="18" fill="#1f5d8c"/>
+        </g>
+        <text x="560" y="120" font-size="12.5" fill="#b5341f" font-weight="600">All cards = same view type.</text>
+        <text x="560" y="140" font-size="12" fill="#4a443d">Share ONE pool so a card recycled</text>
+        <text x="560" y="158" font-size="12" fill="#4a443d">by one carousel is reused by the next.</text>
+      </svg>
+      <figcaption>Fig 8 · The nested-list pool-sharing fix</figcaption>
+    </figure>
+    <pre><code><span class="tok-key">private val</span> sharedPool = RecyclerView.RecycledViewPool()
+
+<span class="tok-key">override fun</span> <span class="tok-fn">onBindViewHolder</span>(holder: RowVH, position: Int) {
+    holder.innerRecyclerView.<span class="tok-fn">setRecycledViewPool</span>(sharedPool)  <span class="tok-arrow">// ← the key line</span>
+    holder.innerRecyclerView.adapter = CarouselAdapter(data[position].cards)
+}
+sharedPool.<span class="tok-fn">setMaxRecycledViews</span>(0, 20)   <span class="tok-cmt">// default 5 is sized for one list</span></code></pre>
+    <div class="box warn">
+      <span class="lab">Required detail or it silently does nothing</span>
+      <p>The pool buckets by <strong>view type</strong>. All carousels must report the <em>same</em> <code>getItemViewType</code> for the same card layout — otherwise the pool keeps them in separate buckets and sharing fails with no error.</p>
+    </div>
+  </section>
+
+  <!-- ============ 9. LM BRAIN ============ -->
+  <section id="lm">
+    <span class="sec-num">Section 09</span>
+    <h2 class="sec">The LayoutManager — the brain</h2>
+    <p>Everything above was the <span class="role house">WAREHOUSE</span> — it stores and hands out holders when asked, but never decides anything. The <span class="role brain">LayoutManager</span> is the thing doing the asking. It answers the three questions the warehouse can't: <strong>which</strong> positions are needed, <strong>where</strong> each goes, and <strong>when</strong> to ask for more / recycle.</p>
+
+    <figure>
+      <svg viewBox="0 0 880 230" xmlns="http://www.w3.org/2000/svg" font-family="JetBrains Mono, monospace">
+        <rect x="300" y="20" width="280" height="40" rx="6" fill="#1f1b17"/>
+        <text x="440" y="45" font-size="13" fill="#ece5d8" text-anchor="middle">RecyclerView (coordinator)</text>
+        <line x1="440" y1="60" x2="440" y2="86" stroke="#8a8278" stroke-width="1.5"/>
+        <g stroke="#8a8278" stroke-width="1.5" fill="none">
+          <path d="M440 86 L160 110"/><path d="M440 86 L440 110"/><path d="M440 86 L720 110"/>
+        </g>
+        <rect x="40" y="112" width="240" height="86" rx="6" fill="#eef4f8" stroke="#1f5d8c" stroke-width="1.5"/>
+        <text x="160" y="138" font-size="13" font-weight="600" fill="#1f5d8c" text-anchor="middle">LayoutManager</text>
+        <text x="160" y="160" font-size="11" fill="#4a443d" text-anchor="middle">the BRAIN —</text>
+        <text x="160" y="176" font-size="11" fill="#4a443d" text-anchor="middle">what / where / when</text>
+
+        <rect x="320" y="112" width="240" height="86" rx="6" fill="#fbf3f1" stroke="#b5341f" stroke-width="1.5"/>
+        <text x="440" y="138" font-size="13" font-weight="600" fill="#b5341f" text-anchor="middle">Recycler</text>
+        <text x="440" y="160" font-size="11" fill="#4a443d" text-anchor="middle">the WAREHOUSE —</text>
+        <text x="440" y="176" font-size="11" fill="#4a443d" text-anchor="middle">scrap / cache / pool</text>
+
+        <rect x="600" y="112" width="240" height="86" rx="6" fill="#eef6f0" stroke="#2e7d4f" stroke-width="1.5"/>
+        <text x="720" y="138" font-size="13" font-weight="600" fill="#2e7d4f" text-anchor="middle">Adapter</text>
+        <text x="720" y="160" font-size="11" fill="#4a443d" text-anchor="middle">the FACTORY —</text>
+        <text x="720" y="176" font-size="11" fill="#4a443d" text-anchor="middle">inflate &amp; bind (your code)</text>
+
+        <path d="M280 145 L318 145" stroke="#b5341f" stroke-width="1.5" fill="none" marker-end="url(#ar5)" stroke-dasharray="4 3"/>
+        <text x="299" y="138" font-size="9" fill="#b5341f" text-anchor="middle">asks</text>
+        <defs><marker id="ar5" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto">
+          <path d="M0,0 L8,4 L0,8 z" fill="#b5341f"/></marker></defs>
+      </svg>
+      <figcaption>Fig 9 · Brain · Warehouse · Factory — every getViewForPosition call came from the LayoutManager</figcaption>
+    </figure>
+
+    <h4>Filling an empty screen — the fill loop</h4>
+    <p>The LayoutManager keeps a <strong>fill pointer</strong> (where the next item goes) and lays items down one at a time, walking down the screen until it runs out of room. Screen 600px, rows 150px:</p>
+    <pre><code>pointer=0 → getViewForPosition(0) → measure(150) → place 0..150 → pointer=150
+pointer=150 &lt; 600 → getViewForPosition(1) → place 150..300 → pointer=300
+pointer=300 &lt; 600 → getViewForPosition(2) → place 300..450 → pointer=450
+pointer=450 &lt; 600 → getViewForPosition(3) → place 450..600 → pointer=600
+pointer=600 is NOT &lt; 600 → screen full → STOP
+
+Asked for items 0,1,2,3 and STOPPED. Items 4..99,999 never touched.</code></pre>
+    <p>That loop — <em>place, advance pointer, check for room, repeat until full</em> — is the entire core of a LayoutManager, and it is <strong>literally where</strong> the "only build what's visible" magic comes from. The per-child measure is the measure cost; on a fresh screen all four fetches fall through to inflate (the startup burst).</p>
+  </section>
+
+  <!-- ============ 10. LM CODE ============ -->
+  <section id="lm-code">
+    <span class="sec-num">Section 10</span>
+    <h2 class="sec">LayoutManager in code &amp; the full call chain</h2>
+    <p>The framework calls two key methods. Note it <strong>hands the LayoutManager the <code>Recycler</code> as a parameter</strong> — that is how the brain gets to call the warehouse; it doesn't own it.</p>
+
+    <h4>onLayoutChildren — the fill loop (initial layout)</h4>
+    <pre><code><span class="tok-key">override fun</span> <span class="tok-fn">onLayoutChildren</span>(recycler: Recycler, state: State) {
+    <span class="tok-fn">detachAndScrapAttachedViews</span>(recycler)   <span class="tok-cmt">// park current views in scrap</span>
+    <span class="tok-key">var</span> fillPointer = 0; <span class="tok-key">var</span> position = 0
+
+    <span class="tok-key">while</span> (fillPointer &lt; height &amp;&amp; position &lt; state.itemCount) {
+        <span class="tok-key">val</span> view = recycler.<span class="tok-fn">getViewForPosition</span>(position)  <span class="tok-cmt">// ask warehouse</span>
+        <span class="tok-fn">addView</span>(view)
+        <span class="tok-fn">measureChildWithMargins</span>(view, 0, 0)            <span class="tok-cmt">// "how tall are you?"</span>
+        <span class="tok-key">val</span> h = <span class="tok-fn">getDecoratedMeasuredHeight</span>(view)
+        <span class="tok-fn">layoutDecorated</span>(view, 0, fillPointer, width, fillPointer + h)
+        fillPointer += h; position++                  <span class="tok-cmt">// advance + next</span>
+    }
+}</code></pre>
+
+    <h4>scrollVerticallyBy — shift · recycle · fill</h4>
+    <pre><code><span class="tok-key">override fun</span> <span class="tok-fn">scrollVerticallyBy</span>(dy: Int, recycler: Recycler, state: State): Int {
+    <span class="tok-fn">offsetChildrenVertical</span>(-dy)          <span class="tok-cmt">// ① SHIFT — cheap slide, no fetch</span>
+    <span class="tok-fn">recycleViewsOutOfBounds</span>(recycler)    <span class="tok-cmt">// ② RECYCLE — hand edge views to warehouse</span>
+    <span class="tok-fn">fill</span>(recycler, state)                 <span class="tok-cmt">// ③ FILL the newly exposed edge</span>
+    <span class="tok-key">return</span> dy
+}
+
+<span class="tok-key">private fun</span> <span class="tok-fn">recycleViewsOutOfBounds</span>(recycler: Recycler) {
+    <span class="tok-key">for</span> (i <span class="tok-key">in</span> childCount - 1 downTo 0) {
+        <span class="tok-key">val</span> child = <span class="tok-fn">getChildAt</span>(i)
+        <span class="tok-key">if</span> (<span class="tok-fn">getDecoratedBottom</span>(child) &lt; 0)          <span class="tok-cmt">// fully off the top?</span>
+            <span class="tok-fn">removeAndRecycleView</span>(child, recycler)  <span class="tok-arrow">// ← THIS sends VH-0 into cache/pool</span>
+    }
+}</code></pre>
+
+    <div class="box note">
+      <span class="lab">addView ≠ adding to the LayoutManager</span>
+      <p>The LayoutManager is <strong>not</strong> a ViewGroup and owns no children. <code>addView</code> is a <em>command it issues to its host RecyclerView</em> (a remote control), so the children live on the RecyclerView. This is exactly why you can hot-swap the brain (<code>layoutManager = GridLayoutManager(...)</code>) while the body and its children stay put. <code>attachView</code> re-attaches a temporarily-detached (scrapped) view; both put the child on the RecyclerView.</p>
+    </div>
+
+    <h4>The full chain — finger to pool</h4>
+    <pre><code>USER drags finger up
+   → RecyclerView.onTouchEvent()                <span class="tok-cmt">// gesture detection, dy=100</span>
+   → layoutManager.scrollVerticallyBy(100, recycler, state)   <span class="tok-cmt">// OUR method</span>
+        ├─ offsetChildrenVertical(-100)          ① shift (cheap)
+        ├─ recycleViewsOutOfBounds(recycler)     ② recycle
+        │     └─ removeAndRecycleView(child) → recycler stores → CACHE → POOL
+        └─ fill(recycler, state)                 ③ fill
+              └─ recycler.getViewForPosition(4)
+                    ├─ checks scrap / cache / pool   (cheapest-first)
+                    └─ adapter.onBindViewHolder(vh, 4)   <span class="tok-arrow">← YOUR code runs</span></code></pre>
+    <div class="summary">Read that top to bottom and you have the <strong>entire system in one call stack</strong>: touch → LayoutManager (brain) → Recycler (warehouse) → Adapter (factory). A scroll touches only the <strong>edges</strong> — recycle one off the trailing edge, fill one onto the leading edge, slide the middle — which is why list size is irrelevant to scroll cost. The real <code>LinearLayoutManager</code> funnels both methods through one shared <code>fill()</code>, because initial-layout and scroll-fill are the same act pointed at a different edge.</div>
+  </section>
+
+  <!-- ============ 11. GRID/STAGGERED ============ -->
+  <section id="grid">
+    <span class="sec-num">Section 11</span>
+    <h2 class="sec">Grid &amp; Staggered — variations on one loop</h2>
+    <p>Both reuse the identical recycling engine, parking lots, and touch→Adapter chain. They differ <strong>only</strong> in the fill loop's geometry.</p>
+
+    <h3>GridLayoutManager — "place N items before advancing the pointer"</h3>
+    <p>An inner loop places <code>spanCount</code> items side by side, then the pointer advances <strong>once</strong>, by the tallest cell in that row.</p>
+    <figure>
+      <svg viewBox="0 0 880 200" xmlns="http://www.w3.org/2000/svg" font-family="JetBrains Mono, monospace">
+        <text x="30" y="26" font-size="12" fill="#8a8278">3 spans · pointer advances by tallest cell per row</text>
+        <g>
+          <rect x="60" y="42" width="240" height="56" fill="#eef4f8" stroke="#1f5d8c"/><text x="180" y="74" font-size="12" fill="#1f5d8c" text-anchor="middle">Item 0</text>
+          <rect x="300" y="42" width="240" height="56" fill="#eef4f8" stroke="#1f5d8c"/><text x="420" y="74" font-size="12" fill="#1f5d8c" text-anchor="middle">Item 1</text>
+          <rect x="540" y="42" width="240" height="56" fill="#eef4f8" stroke="#1f5d8c"/><text x="660" y="74" font-size="12" fill="#1f5d8c" text-anchor="middle">Item 2</text>
+          <rect x="60" y="98" width="240" height="56" fill="#f4efe7" stroke="#d4c9b6"/><text x="180" y="130" font-size="12" fill="#4a443d" text-anchor="middle">Item 3</text>
+          <rect x="300" y="98" width="240" height="56" fill="#f4efe7" stroke="#d4c9b6"/><text x="420" y="130" font-size="12" fill="#4a443d" text-anchor="middle">Item 4</text>
+          <rect x="540" y="98" width="240" height="56" fill="#f4efe7" stroke="#d4c9b6"/><text x="660" y="130" font-size="12" fill="#4a443d" text-anchor="middle">Item 5</text>
+        </g>
+        <text x="30" y="186" font-size="11" fill="#8a8278">SpanSizeLookup lets one item span multiple columns (e.g. a full-width header).</text>
+      </svg>
+      <figcaption>Fig 10 · Grid = inner span loop, advance Y by the row's tallest cell</figcaption>
+    </figure>
+    <pre><code><span class="tok-key">val</span> grid = GridLayoutManager(context, 3)   <span class="tok-cmt">// 3 columns</span>
+grid.spanSizeLookup = <span class="tok-key">object</span> : SpanSizeLookup() {
+    <span class="tok-key">override fun</span> <span class="tok-fn">getSpanSize</span>(position: Int) =
+        <span class="tok-key">if</span> (position == 0) 3 <span class="tok-key">else</span> 1   <span class="tok-cmt">// item 0 = full-width header</span>
+}</code></pre>
+
+    <h3>StaggeredGridLayoutManager — "one fill pointer per column"</h3>
+    <p>Pinterest-style. Each column has its own pointer; each item goes into <strong>whichever column is currently shortest</strong>, and only that column's pointer advances.</p>
+    <figure>
+      <svg viewBox="0 0 880 220" xmlns="http://www.w3.org/2000/svg" font-family="JetBrains Mono, monospace">
+        <text x="30" y="26" font-size="12" fill="#8a8278">2 columns · place into shortest column · no row alignment</text>
+        <rect x="120" y="42" width="280" height="120" fill="#eef4f8" stroke="#1f5d8c"/><text x="260" y="106" font-size="12" fill="#1f5d8c" text-anchor="middle">Item 0  (tall, 250)</text>
+        <rect x="420" y="42" width="280" height="54" fill="#eef6f0" stroke="#2e7d4f"/><text x="560" y="74" font-size="12" fill="#2e7d4f" text-anchor="middle">Item 1  (short, 120)</text>
+        <rect x="420" y="96" width="280" height="66" fill="#eef6f0" stroke="#2e7d4f"/><text x="560" y="134" font-size="12" fill="#2e7d4f" text-anchor="middle">Item 2</text>
+        <text x="30" y="196" font-size="11" fill="#8a8278">Col 1 stayed shorter, so items 1 &amp; 2 both packed there — independent flow.</text>
+      </svg>
+      <figcaption>Fig 11 · Staggered = N pointers, place into shortest column</figcaption>
+    </figure>
+    <div class="box warn">
+      <span class="lab">The cost Staggered pays</span>
+      <p>In Linear/Grid the position↔location mapping is predictable. In Staggered it <em>depends on every item's height before it</em> — so it does extra bookkeeping, may <strong>re-shuffle items between columns</strong> as you scroll (items "jump"), and can't cheaply jump to an arbitrary position. Control the jumpiness with <code>setGapStrategy(...)</code>.</p>
+    </div>
+
+    <table>
+      <thead><tr><th></th><th>Fill pointer</th><th>Items per step</th><th>Row alignment</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Linear</strong></td><td>one</td><td>1</td><td>n/a (single col)</td></tr>
+        <tr><td><strong>Grid</strong></td><td>one</td><td>spanCount</td><td>aligned rows</td></tr>
+        <tr><td><strong>Staggered</strong></td><td>one per column</td><td>1 (→ shortest col)</td><td>NOT aligned</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ============ 12. DIFFUTIL ============ -->
+  <section id="diff">
+    <span class="sec-num">Section 12</span>
+    <h2 class="sec">DiffUtil &amp; ListAdapter — updating without nuking</h2>
+    <p>Everything above was about <em>displaying</em>. DiffUtil is about a different problem: <strong>the data changed — now what?</strong></p>
+
+    <h4>The sledgehammer: notifyDataSetChanged()</h4>
+    <p>It tells the system <em>"I have no idea what changed — assume all of it did."</em> So RecyclerView rebinds <strong>all</strong> visible rows and <strong>cannot animate</strong> anything (it doesn't know what moved where). Correct, but wasteful and ugly.</p>
+
+    <h4>What we actually want — granular calls</h4>
+    <pre><code>notifyItemChanged(5)    → rebind ONLY row 5
+notifyItemInserted(2)   → animate it sliding in
+notifyItemRemoved(8)    → animate it sliding out
+notifyItemMoved(3, 7)   → animate the move</code></pre>
+    <p>Computing these by hand every update is tedious and error-prone. <strong>DiffUtil automates exactly that hand-comparison</strong> — give it the old &amp; new lists; it computes the minimal insert/remove/move/change ops and dispatches them.</p>
+
+    <figure>
+      <svg viewBox="0 0 880 130" xmlns="http://www.w3.org/2000/svg" font-family="JetBrains Mono, monospace">
+        <rect x="40" y="44" width="150" height="40" rx="4" fill="#faf7f2" stroke="#d4c9b6"/><text x="115" y="69" font-size="12" fill="#4a443d" text-anchor="middle">OLD list</text>
+        <rect x="40" y="92" width="150" height="30" rx="4" fill="#faf7f2" stroke="#d4c9b6"/><text x="115" y="112" font-size="12" fill="#4a443d" text-anchor="middle">NEW list</text>
+        <rect x="330" y="58" width="180" height="46" rx="6" fill="#1f1b17"/><text x="420" y="86" font-size="13" fill="#ece5d8" text-anchor="middle">DiffUtil</text>
+        <rect x="630" y="58" width="210" height="46" rx="4" fill="#eef6f0" stroke="#2e7d4f"/><text x="735" y="80" font-size="11" fill="#2e7d4f" text-anchor="middle">minimal insert/remove/</text><text x="735" y="96" font-size="11" fill="#2e7d4f" text-anchor="middle">move/change → dispatched</text>
+        <g stroke="#8a8278" stroke-width="1.5" fill="none">
+          <path d="M190 70 L326 78" marker-end="url(#ar6)"/>
+          <path d="M190 104 L326 86" marker-end="url(#ar6)"/>
+          <path d="M510 81 L626 81" marker-end="url(#ar6)"/>
+        </g>
+        <defs><marker id="ar6" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto">
+          <path d="M0,0 L8,4 L0,8 z" fill="#8a8278"/></marker></defs>
+      </svg>
+      <figcaption>Fig 12 · Two lists in, a precise changelog out</figcaption>
+    </figure>
+
+    <h4>The two questions — the crux of the whole topic</h4>
+    <pre><code><span class="tok-cmt">// Q1: are these the SAME ENTITY? → compare IDs</span>
+<span class="tok-key">override fun</span> <span class="tok-fn">areItemsTheSame</span>(a, b) = a.id == b.id
+
+<span class="tok-cmt">// Q2: does that entity have the SAME CONTENTS? → compare fields</span>
+<span class="tok-cmt">//     (only asked when Q1 returned true)</span>
+<span class="tok-key">override fun</span> <span class="tok-fn">areContentsTheSame</span>(a, b) = a == b</code></pre>
+    <table>
+      <thead><tr><th>Q1 (same item?)</th><th>Q2 (same contents?)</th><th>Action</th></tr></thead>
+      <tbody>
+        <tr><td>true</td><td>true</td><td>do <strong>nothing</strong></td></tr>
+        <tr><td>true</td><td>false</td><td><code>notifyItemChanged</code> (rebind)</td></tr>
+        <tr><td>in old, not new</td><td>—</td><td><code>notifyItemRemoved</code></td></tr>
+        <tr><td>in new, not old</td><td>—</td><td><code>notifyItemInserted</code></td></tr>
+        <tr><td>same id, new position</td><td>—</td><td><code>notifyItemMoved</code></td></tr>
+      </tbody>
+    </table>
+
+    <div class="box warn">
+      <span class="lab">The classic bug — why identity must be separate from equality</span>
+      <p>If <code>areItemsTheSame</code> compared <em>all</em> fields, then liking a post (<code>likes 10 → 11</code>) would read as "old item removed, new item inserted" → the row animates out and a different one animates in, a jarring flicker. Identity (ID) says "still post 42, just changed" → clean in-place update, and <code>areContentsTheSame</code> then catches the content change. <strong>Separating identity from equality is what makes the animations correct.</strong> This is the #1 DiffUtil mistake.</p>
+    </div>
+
+    <h4>ListAdapter — the modern standard</h4>
+    <p>A thin <code>RecyclerView.Adapter</code> subclass with <code>AsyncListDiffer</code> baked in. You call <code>submitList(newList)</code>; it runs the diff on a <strong>background thread</strong>, then dispatches the granular <code>notify*</code> calls on the main thread. This is the current default for list-driven RecyclerViews.</p>
+    <pre><code><span class="tok-key">class</span> <span class="tok-fn">PostAdapter</span> : ListAdapter&lt;Post, PostVH&gt;(DIFF) {
+    <span class="tok-key">companion object</span> {
+        <span class="tok-key">val</span> DIFF = <span class="tok-key">object</span> : DiffUtil.ItemCallback&lt;Post&gt;() {
+            <span class="tok-key">override fun</span> <span class="tok-fn">areItemsTheSame</span>(a: Post, b: Post) = a.id == b.id
+            <span class="tok-key">override fun</span> <span class="tok-fn">areContentsTheSame</span>(a: Post, b: Post) = a == b
+        }
+    }
+    <span class="tok-cmt">// onCreate/onBind only — no getItemCount, no manual notify*</span>
+}
+adapter.<span class="tok-fn">submitList</span>(newList)</code></pre>
+    <div class="box warn">
+      <span class="lab">The most common ListAdapter bug</span>
+      <p><strong>Never mutate the submitted list and resubmit it.</strong> <code>submitList</code> may see "same list reference, nothing changed." Always submit a <em>new</em> list (<code>oldList.toList()</code> with changes, or a fresh list from your data layer).</p>
+    </div>
+  </section>
+
+  <!-- ============ 13. BIG LIST ============ -->
+  <section id="biglist">
+    <span class="sec-num">Section 13</span>
+    <h2 class="sec">Handling a very big list</h2>
+    <p>"Big list" hides several distinct problems with different fixes. The thread tying them together: <strong>RecyclerView already solved "many items" via recycling — so for a big list your job is almost never the count.</strong> It's (a) keeping per-row work cheap, (b) feeding the list incrementally if unbounded, and (c) diffing off the main thread when it changes.</p>
+
+    <table>
+      <thead><tr><th>Kind of "big"</th><th>The real problem</th><th>What you do</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Bounded, in-memory</strong> (1k–50k)</td><td>per-row bind/measure cost — <em>independent of list size</em></td><td>lean <code>onBindViewHolder</code> (no findViewById/alloc/IO), flat layout, <code>setHasFixedSize</code></td></tr>
+        <tr><td><strong>Unbounded / server</strong></td><td>can't load it all → must page</td><td>fetch before hitting bottom (threshold), guard double-fire, loading footer, submit fresh lists; or use <strong>Paging 3</strong></td></tr>
+        <tr><td><strong>Variable heights</strong></td><td>total height unknown → scrollbar/offset are estimates</td><td>prefer <code>smoothScrollToPosition</code>, accept estimation, set Staggered gap strategy</td></tr>
+        <tr><td><strong>Multiple view types</strong></td><td>pool buckets per type → more inflation</td><td>cheap deterministic <code>getItemViewType</code>, share one pool for nested lists, bump <code>setMaxRecycledViews</code> for hot types</td></tr>
+        <tr><td><strong>Frequently updating</strong></td><td>DiffUtil on main thread freezes UI</td><td><strong>ListAdapter / AsyncListDiffer</strong> (bg diff); careful prepend + stable IDs</td></tr>
+        <tr><td><strong>Memory / lifecycle</strong></td><td>leaked async work on recycled holders</td><td><code>onViewRecycled</code> to cancel pending work; <code>setHasStableIds</code>; don't crank cache size on forward feeds</td></tr>
+      </tbody>
+    </table>
+
+    <div class="box note">
+      <span class="lab">The "wrong content in wrong row" mechanism</span>
+      <p>A fast fling can rebind a holder before its async bind-work finishes. The fix is structural: override <code>onViewRecycled(holder)</code> to cancel any pending load/coroutine bound to that row, so stale work never lands on a now-recycled holder.</p>
+    </div>
+
+    <div class="summary"><strong>For a bounded in-memory list, "big" is a per-row-cost problem, not a count problem.</strong> Recycling already made count free; complexity per row and update frequency are where big lists live or die.</div>
+  </section>
+
+  <div class="next">
+    <span class="lab">↳ Next session</span>
+    <p>The Compose bridge — where half this machinery <em>evaporates</em> (no holders, no pool, no scrap) and the other half reappears: <code>areItemsTheSame</code> becomes <code>key = { it.id }</code>, rebind becomes recomposition, and the measure/layout phases return in a new form inside <code>LazyColumn</code>.</p>
+  </div>
