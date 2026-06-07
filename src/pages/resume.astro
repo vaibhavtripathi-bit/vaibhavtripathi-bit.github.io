@@ -1,0 +1,153 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { SITE_TITLE, SITE_URL, AUTHOR } from "../consts.ts";
+
+const summary = [
+  "15+ years architecting iOS/Android platforms for T-Mobile (15M+ devices), Ford Motor Company, and TATA Group.",
+  "Shipped 10+ apps end-to-end across iOS and Android for brands including McDonald's India (10M+ downloads), Michael Kors, and Tanishq (4.6★).",
+  "Led teams of 15+ engineers · Reduced DoS attacks 70% · Improved ratings 3.5→4.5+ · Cut critical bugs 65%.",
+  "Expert: Swift, Kotlin, Clean Architecture, SwiftUI, Jetpack Compose, MVVM, reactive programming.",
+];
+
+const skills = [
+  { label: "Languages", vals: "Swift · Kotlin · Java · Objective-C · C/C++" },
+  { label: "Architecture", vals: "Clean Architecture · MVVM · MVI · Domain-Driven Design · Modular Systems" },
+  { label: "Modern Stack", vals: "SwiftUI · Jetpack Compose · Combine · Coroutines/Flow · RxJava · Jetpack Components" },
+  { label: "DevOps", vals: "Jenkins · Azure · Bitrise · Git · Unit Testing (Quick, Kotest) · Performance Profiling" },
+];
+
+const jobs = [
+  {
+    role: "Staff Engineer — Module Owner · T-Mobile Diagnostics Platform",
+    org: "GlobalLogic (Hitachi Group)",
+    dates: "2024 – Present",
+    points: [
+      "Designed and built 3 Android SDK modules from scratch for a diagnostics platform spanning 15M+ devices — covering no-coverage zone detection, satellite connectivity tracking, and network throughput measurement.",
+      "Resolved critical production bugs including ANR crashes, race conditions, and data-integrity issues; refactored core infrastructure with Hilt DI and coroutine-safe concurrency — cutting critical bugs 65%.",
+    ],
+  },
+  {
+    role: "Solution Architect · Ford Credit Mobile Platform (iOS & Android)",
+    org: "GlobalLogic (Hitachi Group)",
+    dates: "2023 – 2024",
+    points: [
+      "Drove mobile architecture strategy for Ford Motor Company's financial services (Kotlin, Swift, MVVM, Jetpack Compose, SwiftUI).",
+      "Established technical governance, code-quality standards, and architecture-review processes across engineering teams.",
+      "Mentored senior engineers on advanced patterns: reactive programming, clean architecture, and platform best practices.",
+    ],
+  },
+  {
+    role: "Senior Engineer · Michael Kors (iOS & Android)",
+    org: "GlobalLogic (Hitachi Group)",
+    dates: "2022 – 2023",
+    points: [
+      "Delivered the end-to-end mobile application for Michael Kors across iOS and Android.",
+      "Implemented Play Integrity API & app attestation → 70% reduction in DoS attacks.",
+    ],
+  },
+  {
+    role: "Technical Architect · Tanishq Jewellery (TATA Group)",
+    org: "Robosoft Technologies (TechnoPro Holdings)",
+    dates: "2020 – 2022",
+    points: [
+      "Architected India's premier jewellery e-commerce platform (1M+ downloads) using Clean Architecture & Domain-Driven Design.",
+      "Drove in-app review strategy → rating increased 3.5 to 4.5+, improving user acquisition and retention.",
+    ],
+  },
+  {
+    role: "Senior Mobile Engineer & Tech Lead",
+    org: "Robosoft Technologies (TechnoPro Holdings)",
+    dates: "2009 – 2020",
+    points: [
+      "Delivered end-to-end apps for brands including McDonald's India (10M+ downloads), World of Titan, Zee News, and Dainik Bhaskar; contributed features and modules for ESPN Cricinfo, PayPay, and others.",
+      "Owned iOS and Android architecture across projects — from offline-first systems and real-time sync to payment integrations.",
+      "Modularized codebases using clean architecture, reducing complexity and improving maintainability.",
+      "Led a team of 15+, mentored engineers, and ran workshops on emerging mobile technologies.",
+      "Integrated performance monitoring and logging, improving app startup time and core UX metrics.",
+      "Established CI/CD pipelines, testing frameworks, and mobile engineering best practices across teams.",
+    ],
+  },
+];
+
+const siteHost = SITE_URL.replace(/^https?:\/\//, "");
+const ghHandle = AUTHOR.github.replace(/^https?:\/\//, "");
+const liHandle = AUTHOR.linkedin.replace(/^https?:\/\//, "").replace(/\/$/, "");
+---
+
+<BaseLayout
+  title={`Résumé | ${SITE_TITLE}`}
+  description="Résumé of Vaibhav Tripathi — Mobile Architect with 15+ years building iOS and Android platforms."
+>
+  <main class="resume">
+    <header class="resume-head">
+      <h1 class="resume-name">{AUTHOR.name}</h1>
+      <p class="resume-title">Mobile Architect · iOS &amp; Android Platforms</p>
+      <div class="resume-contact">
+        <a href={`mailto:${AUTHOR.email}`}>{AUTHOR.email}</a>
+        <span>·</span>
+        <span>{AUTHOR.location}</span>
+        <span>·</span>
+        <a href={AUTHOR.linkedin} target="_blank" rel="noreferrer">{liHandle}</a>
+        <span>·</span>
+        <a href={AUTHOR.github} target="_blank" rel="noreferrer">{ghHandle}</a>
+        <span>·</span>
+        <a href={SITE_URL} target="_blank" rel="noreferrer">{siteHost}</a>
+      </div>
+      <div class="resume-actions">
+        <button class="pbtn pbtn-primary" id="printBtn" type="button">Print / Save as PDF</button>
+        <a class="pbtn" href="/assets/Vaibhav_Tripathi_Mobile_Architect.pdf" download>Download PDF</a>
+      </div>
+    </header>
+
+    <section class="resume-section">
+      <h2 class="resume-sec-title">Impact Summary</h2>
+      <ul class="resume-summary">
+        {summary.map((s) => <li>{s}</li>)}
+      </ul>
+    </section>
+
+    <section class="resume-section">
+      <h2 class="resume-sec-title">Technical Expertise</h2>
+      <div class="skill-rows">
+        {skills.map((s) => (
+          <div class="skill-row">
+            <span class="label">{s.label}</span>
+            <span class="vals">{s.vals}</span>
+          </div>
+        ))}
+      </div>
+    </section>
+
+    <section class="resume-section">
+      <h2 class="resume-sec-title">Professional Experience</h2>
+      {jobs.map((j) => (
+        <div class="job">
+          <div class="job-head">
+            <p class="job-role">{j.role}</p>
+            <span class="job-dates">{j.dates}</span>
+          </div>
+          <div class="job-org">{j.org}</div>
+          <ul>
+            {j.points.map((p) => <li>{p}</li>)}
+          </ul>
+        </div>
+      ))}
+    </section>
+
+    <section class="resume-section">
+      <h2 class="resume-sec-title">Education</h2>
+      <div class="job">
+        <div class="job-head">
+          <p class="job-role">B.Tech, Computer Science &amp; Engineering</p>
+        </div>
+        <div class="job-org">MMMEC Govt. Engineering College, Gorakhpur, India</div>
+      </div>
+    </section>
+
+    <p style="margin-top:30px"><a class="back-link" href="/about">← Back to profile</a></p>
+  </main>
+</BaseLayout>
+
+<script>
+  document.getElementById("printBtn")?.addEventListener("click", () => window.print());
+</script>
