@@ -3,10 +3,10 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 import { SITE_TITLE, AUTHOR } from "../consts.ts";
 
 const metrics = [
-  { value: "15M+", label: "Device-scale diagnostics platform work for T-Mobile infrastructure." },
-  { value: "10+", label: "iOS and Android apps delivered across consumer and enterprise brands." },
-  { value: "70%", label: "Reduction in DoS attacks via Play Integrity API and app attestation." },
-  { value: "15+", label: "Engineers led and mentored across mobile architecture teams." },
+  { value: "15+", label: "Years building mobile platforms" },
+  { value: "15M+", label: "Device-scale diagnostics at T-Mobile" },
+  { value: "10+", label: "iOS & Android apps shipped" },
+  { value: "70%", label: "DoS attacks cut via Play Integrity" },
 ];
 
 const experience = [
@@ -56,10 +56,10 @@ const experience = [
 ];
 
 const skills = [
-  { k: "Languages", v: "Swift, Kotlin, Java, Objective-C, C, C++" },
-  { k: "Architecture", v: "Clean Architecture, MVVM, MVI, domain-driven design, modular systems" },
-  { k: "Modern Mobile Stack", v: "SwiftUI, Jetpack Compose, Combine, Coroutines, Flow, RxJava, Jetpack Components" },
-  { k: "Engineering Practices", v: "Jenkins, Azure, Bitrise, Git, unit testing, Quick, Kotest, performance profiling" },
+  { k: "Languages", items: ["Swift", "Kotlin", "Java", "Objective-C", "C", "C++"] },
+  { k: "Architecture", items: ["Clean Architecture", "MVVM", "MVI", "Domain-Driven Design", "Modular Systems"] },
+  { k: "Modern Mobile Stack", items: ["SwiftUI", "Jetpack Compose", "Combine", "Coroutines", "Flow", "RxJava", "Jetpack"] },
+  { k: "Engineering Practices", items: ["Jenkins", "Azure", "Bitrise", "Git", "Unit Testing", "Quick", "Kotest", "Profiling"] },
 ];
 ---
 
@@ -67,31 +67,41 @@ const skills = [
   title={`About | ${SITE_TITLE}`}
   description="Vaibhav Tripathi — Mobile Architect with 15+ years building iOS and Android platforms. Clean architecture, Swift, Kotlin, SwiftUI, and Jetpack Compose."
 >
-  <main class="container">
-    <section class="about-hero">
-      <span class="tag">Mobile Architect · 15+ years</span>
-      <h1>{AUTHOR.name}</h1>
-      <p class="lede">
-        Mobile Architect building scalable iOS and Android platforms for enterprise, retail,
-        telecom, automotive, fintech, media, and commerce products — and the engineer behind the
-        tutorials on this site.
-      </p>
-      <div class="about-actions">
-        <a class="btn btn-primary" href={`mailto:${AUTHOR.email}`}>Email</a>
-        <a class="btn btn-ghost" href={AUTHOR.linkedin} target="_blank" rel="noreferrer">LinkedIn</a>
-        <a class="btn btn-ghost" href={AUTHOR.github} target="_blank" rel="noreferrer">GitHub</a>
-        <a class="btn btn-ghost" href="/assets/Vaibhav_Tripathi_Mobile_Architect.pdf" download>Résumé</a>
-      </div>
-      <div class="about-facts">
-        <div><span>Role</span><strong>Mobile Architect</strong></div>
-        <div><span>Location</span><strong>{AUTHOR.location}</strong></div>
-        <div><span>Focus</span><strong>iOS, Android, Platform Architecture</strong></div>
+  <main class="container profile">
+    <!-- Hero -->
+    <section class="profile-hero">
+      <div class="avatar" aria-hidden="true">VT</div>
+      <div class="profile-id">
+        <span class="role-badge"><span class="dot"></span> Mobile Architect · 15+ years</span>
+        <h1>{AUTHOR.name}</h1>
+        <p class="profile-loc">{AUTHOR.location} · iOS · Android · Platform Architecture</p>
+        <p class="profile-lede">
+          I build scalable iOS and Android platforms for enterprise, retail, telecom, automotive,
+          fintech, media, and commerce — and I write the tutorials on this site.
+        </p>
+        <div class="profile-actions">
+          <a class="pbtn pbtn-primary" href={`mailto:${AUTHOR.email}`}>Email me</a>
+          <a class="pbtn" href={AUTHOR.linkedin} target="_blank" rel="noreferrer">LinkedIn</a>
+          <a class="pbtn" href={AUTHOR.github} target="_blank" rel="noreferrer">GitHub</a>
+          <a class="pbtn" href="/assets/Vaibhav_Tripathi_Mobile_Architect.pdf" download>Résumé ↓</a>
+        </div>
       </div>
     </section>
 
-    <section class="about-block">
-      <p class="seclabel">Profile</p>
-      <p class="body">
+    <!-- Stats -->
+    <section class="profile-stats">
+      {metrics.map((m) => (
+        <div class="pstat">
+          <strong>{m.value}</strong>
+          <span>{m.label}</span>
+        </div>
+      ))}
+    </section>
+
+    <!-- Profile -->
+    <section class="profile-section">
+      <h2 class="psec-title">Profile</h2>
+      <p class="psec-body">
         Experienced in clean architecture, modular systems, MVVM, MVI, domain-driven design,
         reactive programming, CI/CD, performance profiling, and production-quality mobile
         engineering. Strong hands-on background across Swift, Kotlin, Java, Objective-C, C/C++,
@@ -99,55 +109,53 @@ const skills = [
       </p>
     </section>
 
-    <section class="about-block">
-      <p class="seclabel">Impact</p>
-      <div class="stat-row">
-        {metrics.map((m) => (
-          <div class="stat">
-            <strong>{m.value}</strong>
-            <span>{m.label}</span>
+    <!-- Experience -->
+    <section class="profile-section">
+      <h2 class="psec-title">Experience</h2>
+      <div class="timeline">
+        {experience.map((e) => (
+          <div class="tl-item">
+            <div class="tl-period">{e.period}</div>
+            <p class="tl-role">{e.role}</p>
+            <span class="tl-org">{e.org}</span>
+            {e.points.map((p) => <p class="tl-body">{p}</p>)}
           </div>
         ))}
       </div>
     </section>
 
-    <section class="about-block">
-      <p class="seclabel">Experience</p>
-      <div class="cv">
-        {experience.map((e) => (
-          <div class="cv-item">
-            <div class="cv-period">{e.period}<b>{e.org}</b></div>
-            <div>
-              <p class="cv-role">{e.role}</p>
-              {e.points.map((p) => <p class="cv-body">{p}</p>)}
+    <!-- Skills -->
+    <section class="profile-section">
+      <h2 class="psec-title">Skills</h2>
+      <div class="skill-blocks">
+        {skills.map((s) => (
+          <div class="skill-block">
+            <span class="skill-k">{s.k}</span>
+            <div class="chips">
+              {s.items.map((i) => <span class="chip">{i}</span>)}
             </div>
           </div>
         ))}
       </div>
     </section>
 
-    <section class="about-block">
-      <p class="seclabel">Skills</p>
-      <div class="skill-list">
-        {skills.map((s) => (
-          <div class="skill-group">
-            <div class="k">{s.k}</div>
-            <div class="v">{s.v}</div>
-          </div>
-        ))}
-      </div>
-    </section>
-
-    <section class="about-block">
-      <p class="seclabel">Education</p>
-      <p class="body">B.Tech, Computer Science and Engineering<br />MMMEC Govt. Engineering College, Gorakhpur, India</p>
-    </section>
-
-    <section class="about-block">
-      <p class="seclabel">Contact</p>
-      <p class="contact-line">
-        {AUTHOR.location} · <a href={`mailto:${AUTHOR.email}`}>{AUTHOR.email}</a>
+    <!-- Education -->
+    <section class="profile-section">
+      <h2 class="psec-title">Education</h2>
+      <p class="psec-body">
+        B.Tech, Computer Science and Engineering<br />
+        MMMEC Govt. Engineering College, Gorakhpur, India
       </p>
+    </section>
+
+    <!-- Contact CTA -->
+    <section class="contact-cta">
+      <h2>Let's build something</h2>
+      <p>Open to mobile architecture and platform leadership conversations.</p>
+      <div class="profile-actions">
+        <a class="pbtn pbtn-primary" href={`mailto:${AUTHOR.email}`}>Email me</a>
+        <a class="pbtn pbtn-onDark" href={AUTHOR.linkedin} target="_blank" rel="noreferrer">Connect on LinkedIn</a>
+      </div>
     </section>
   </main>
 </BaseLayout>
