@@ -1,0 +1,14 @@
+---
+import { SITE_TITLE, AUTHOR } from "../consts.ts";
+---
+
+<footer class="foot">
+  <div class="container">
+    <span>© 2026 {SITE_TITLE}</span>
+    <a href="/tutorials">Articles</a>
+    <a href="/about">About</a>
+    <a href="/rss.xml">RSS</a>
+    <a href={AUTHOR.github} target="_blank" rel="noreferrer">GitHub</a>
+    <a href={AUTHOR.linkedin} target="_blank" rel="noreferrer">LinkedIn</a>
+  </div>
+</footer>

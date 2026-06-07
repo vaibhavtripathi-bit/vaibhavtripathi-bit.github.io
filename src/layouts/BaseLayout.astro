@@ -1,0 +1,31 @@
+---
+// The master page template. Every page renders inside this: it builds the HTML
+// document, injects all <head> SEO via BaseHead, and frames content with the
+// shared Header + Footer. Page content goes where <slot /> is.
+import BaseHead from "../components/BaseHead.astro";
+import Header from "../components/Header.astro";
+import Footer from "../components/Footer.astro";
+import "../styles/global.css";
+
+interface Props {
+  title: string;
+  description?: string;
+  image?: string;
+  type?: "website" | "article";
+  publishedDate?: Date;
+}
+
+const head = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <BaseHead {...head} />
+  </head>
+  <body>
+    <Header />
+    <slot />
+    <Footer />
+  </body>
+</html>

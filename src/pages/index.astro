@@ -1,0 +1,32 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import PostRow from "../components/PostRow.astro";
+import { getTutorials } from "../lib/taxonomy.ts";
+import { SITE_TITLE } from "../consts.ts";
+
+const tutorials = await getTutorials();
+const latest = tutorials.slice(0, 12);
+---
+
+<BaseLayout title={`${SITE_TITLE} | Mobile engineering, in depth`}>
+  <main class="container">
+    <section class="home-hero">
+      <span class="tag">Mobile engineering, in depth</span>
+      <h1>Deep dives on mobile — and the craft around it.</h1>
+      <p class="lede">
+        Production-grade tutorials on Android &amp; iOS from 15+ years shipping apps, plus
+        architecture, systems, and programming fundamentals. Use <strong>Browse</strong> to drill
+        into a topic.
+      </p>
+    </section>
+
+    <section class="feed">
+      <p class="seclabel">Latest</p>
+      {latest.length === 0 ? (
+        <p class="empty">First articles are on the way.</p>
+      ) : (
+        latest.map((t, i) => <PostRow tutorial={t} first={i === 0} />)
+      )}
+    </section>
+  </main>
+</BaseLayout>

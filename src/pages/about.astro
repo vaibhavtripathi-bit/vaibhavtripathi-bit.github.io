@@ -1,0 +1,153 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { SITE_TITLE, AUTHOR } from "../consts.ts";
+
+const metrics = [
+  { value: "15M+", label: "Device-scale diagnostics platform work for T-Mobile infrastructure." },
+  { value: "10+", label: "iOS and Android apps delivered across consumer and enterprise brands." },
+  { value: "70%", label: "Reduction in DoS attacks via Play Integrity API and app attestation." },
+  { value: "15+", label: "Engineers led and mentored across mobile architecture teams." },
+];
+
+const experience = [
+  {
+    period: "2024 — Present",
+    org: "GlobalLogic, Hitachi Group",
+    role: "Staff Engineer, Module Owner · T-Mobile Diagnostics Platform",
+    points: [
+      "Designed and built three Android SDK modules from scratch for diagnostics across no-coverage zone detection, satellite connectivity tracking, and network throughput measurement.",
+      "Resolved ANR crashes, race conditions, and data-integrity issues while refactoring core infrastructure with Hilt dependency injection and coroutine-safe concurrency.",
+    ],
+  },
+  {
+    period: "2023 — 2024",
+    org: "GlobalLogic, Hitachi Group",
+    role: "Solution Architect · Ford Credit Mobile Platform",
+    points: [
+      "Drove mobile architecture strategy for Ford's financial-services apps across Kotlin, Swift, MVVM, Jetpack Compose, and SwiftUI.",
+      "Established technical governance, code-quality standards, architecture reviews, and mentoring for senior engineers.",
+    ],
+  },
+  {
+    period: "2022 — 2023",
+    org: "GlobalLogic, Hitachi Group",
+    role: "Senior Engineer · Michael Kors",
+    points: [
+      "Delivered end-to-end mobile work across iOS and Android, including platform hardening with Play Integrity API and app attestation.",
+    ],
+  },
+  {
+    period: "2020 — 2022",
+    org: "Robosoft Technologies, TechnoPro Holdings",
+    role: "Technical Architect · Tanishq Jewellery",
+    points: [
+      "Architected a jewellery e-commerce platform with clean architecture and domain-driven design, supporting 10L+ downloads and a rating increase from 3.5 to 4.5+.",
+    ],
+  },
+  {
+    period: "2009 — 2020",
+    org: "Robosoft Technologies, TechnoPro Holdings",
+    role: "Senior Mobile Engineer and Tech Lead",
+    points: [
+      "Delivered apps and platform modules for McDonald's India, World of Titan, Zee News, Dainik Bhaskar, ESPN Cricinfo, PayPay, and other brands.",
+      "Owned mobile architecture, modularized codebases, introduced performance monitoring, and established CI/CD and testing practices.",
+    ],
+  },
+];
+
+const skills = [
+  { k: "Languages", v: "Swift, Kotlin, Java, Objective-C, C, C++" },
+  { k: "Architecture", v: "Clean Architecture, MVVM, MVI, domain-driven design, modular systems" },
+  { k: "Modern Mobile Stack", v: "SwiftUI, Jetpack Compose, Combine, Coroutines, Flow, RxJava, Jetpack Components" },
+  { k: "Engineering Practices", v: "Jenkins, Azure, Bitrise, Git, unit testing, Quick, Kotest, performance profiling" },
+];
+---
+
+<BaseLayout
+  title={`About | ${SITE_TITLE}`}
+  description="Vaibhav Tripathi — Mobile Architect with 15+ years building iOS and Android platforms. Clean architecture, Swift, Kotlin, SwiftUI, and Jetpack Compose."
+>
+  <main class="container">
+    <section class="about-hero">
+      <span class="tag">Mobile Architect · 15+ years</span>
+      <h1>{AUTHOR.name}</h1>
+      <p class="lede">
+        Mobile Architect building scalable iOS and Android platforms for enterprise, retail,
+        telecom, automotive, fintech, media, and commerce products — and the engineer behind the
+        tutorials on this site.
+      </p>
+      <div class="about-actions">
+        <a class="btn btn-primary" href={`mailto:${AUTHOR.email}`}>Email</a>
+        <a class="btn btn-ghost" href={AUTHOR.linkedin} target="_blank" rel="noreferrer">LinkedIn</a>
+        <a class="btn btn-ghost" href={AUTHOR.github} target="_blank" rel="noreferrer">GitHub</a>
+        <a class="btn btn-ghost" href="/assets/Vaibhav_Tripathi_Mobile_Architect.pdf" download>Résumé</a>
+      </div>
+      <div class="about-facts">
+        <div><span>Role</span><strong>Mobile Architect</strong></div>
+        <div><span>Location</span><strong>{AUTHOR.location}</strong></div>
+        <div><span>Focus</span><strong>iOS, Android, Platform Architecture</strong></div>
+      </div>
+    </section>
+
+    <section class="about-block">
+      <p class="seclabel">Profile</p>
+      <p class="body">
+        Experienced in clean architecture, modular systems, MVVM, MVI, domain-driven design,
+        reactive programming, CI/CD, performance profiling, and production-quality mobile
+        engineering. Strong hands-on background across Swift, Kotlin, Java, Objective-C, C/C++,
+        SwiftUI, Jetpack Compose, Combine, Coroutines, Flow, RxJava, and Jetpack components.
+      </p>
+    </section>
+
+    <section class="about-block">
+      <p class="seclabel">Impact</p>
+      <div class="stat-row">
+        {metrics.map((m) => (
+          <div class="stat">
+            <strong>{m.value}</strong>
+            <span>{m.label}</span>
+          </div>
+        ))}
+      </div>
+    </section>
+
+    <section class="about-block">
+      <p class="seclabel">Experience</p>
+      <div class="cv">
+        {experience.map((e) => (
+          <div class="cv-item">
+            <div class="cv-period">{e.period}<b>{e.org}</b></div>
+            <div>
+              <p class="cv-role">{e.role}</p>
+              {e.points.map((p) => <p class="cv-body">{p}</p>)}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+
+    <section class="about-block">
+      <p class="seclabel">Skills</p>
+      <div class="skill-list">
+        {skills.map((s) => (
+          <div class="skill-group">
+            <div class="k">{s.k}</div>
+            <div class="v">{s.v}</div>
+          </div>
+        ))}
+      </div>
+    </section>
+
+    <section class="about-block">
+      <p class="seclabel">Education</p>
+      <p class="body">B.Tech, Computer Science and Engineering<br />MMMEC Govt. Engineering College, Gorakhpur, India</p>
+    </section>
+
+    <section class="about-block">
+      <p class="seclabel">Contact</p>
+      <p class="contact-line">
+        {AUTHOR.location} · <a href={`mailto:${AUTHOR.email}`}>{AUTHOR.email}</a>
+      </p>
+    </section>
+  </main>
+</BaseLayout>
