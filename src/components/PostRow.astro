@@ -1,0 +1,29 @@
+---
+// One row in an article feed: breadcrumb (Category › Topic › Sub-topic · date),
+// title, and excerpt. Reused on the home page and every listing page.
+import type { CollectionEntry } from "astro:content";
+import { slugify } from "../consts.ts";
+
+interface Props {
+  tutorial: CollectionEntry<"tutorials">;
+  first?: boolean;
+}
+const { tutorial, first = false } = Astro.props;
+const { title, description, pubDate, category, topic, subtopic } = tutorial.data;
+const date = pubDate.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+const catSlug = slugify(category);
+const topicSlug = slugify(topic);
+---
+
+<a class={`post${first ? " first" : ""}`} href={`/tutorials/${tutorial.id}`}>
+  <div class="crumb">
+    <b>{category}</b>
+    <span>›</span>
+    <span>{topic}</span>
+    {subtopic && (<><span>›</span><span>{subtopic}</span></>)}
+    <span>·</span>
+    <span>{date}</span>
+  </div>
+  <h2 class="post-title">{title}</h2>
+  <p class="excerpt">{description}</p>
+</a>

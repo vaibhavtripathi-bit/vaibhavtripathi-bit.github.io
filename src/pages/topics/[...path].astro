@@ -1,0 +1,129 @@
+---
+// One catch-all route handling all three browse levels:
+//   /topics/mobile                      → category  (lists its topics)
+//   /topics/mobile/android              → topic     (sub-topic chips + articles)
+//   /topics/mobile/android/performance  → sub-topic (articles)
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import PostRow from "../../components/PostRow.astro";
+import { getTutorials, buildMenu } from "../../lib/taxonomy.ts";
+
+export async function getStaticPaths() {
+  const all = await getTutorials();
+  const menu = await buildMenu(all);
+  const paths: any[] = [];
+
+  for (const cat of menu) {
+    const inCat = all.filter((t) => t.data.category === cat.name);
+    paths.push({
+      params: { path: cat.slug },
+      props: {
+        level: "category",
+        heading: cat.name,
+        crumbs: [{ name: cat.name, href: `/topics/${cat.slug}` }],
+        tiles: cat.topics.map((tp) => ({
+          name: tp.name,
+          href: `/topics/${cat.slug}/${tp.slug}`,
+          count: tp.count,
+        })),
+        articles: inCat.slice(0, 10).map((t) => t.id),
+      },
+    });
+
+    for (const tp of cat.topics) {
+      const inTopic = all.filter((t) => t.data.category === cat.name && t.data.topic === tp.name);
+      paths.push({
+        params: { path: `${cat.slug}/${tp.slug}` },
+        props: {
+          level: "topic",
+          heading: tp.name,
+          crumbs: [
+            { name: cat.name, href: `/topics/${cat.slug}` },
+            { name: tp.name, href: `/topics/${cat.slug}/${tp.slug}` },
+          ],
+          chips: tp.subs.map((s) => ({
+            name: s.name,
+            href: `/topics/${cat.slug}/${tp.slug}/${s.slug}`,
+          })),
+          articles: inTopic.map((t) => t.id),
+        },
+      });
+
+      for (const s of tp.subs) {
+        const inSub = all.filter(
+          (t) =>
+            t.data.category === cat.name && t.data.topic === tp.name && t.data.subtopic === s.name
+        );
+        paths.push({
+          params: { path: `${cat.slug}/${tp.slug}/${s.slug}` },
+          props: {
+            level: "sub",
+            heading: s.name,
+            crumbs: [
+              { name: cat.name, href: `/topics/${cat.slug}` },
+              { name: tp.name, href: `/topics/${cat.slug}/${tp.slug}` },
+              { name: s.name, href: `/topics/${cat.slug}/${tp.slug}/${s.slug}` },
+            ],
+            articles: inSub.map((t) => t.id),
+          },
+        });
+      }
+    }
+  }
+  return paths;
+}
+
+const { level, heading, crumbs, tiles = [], chips = [], articles = [] } = Astro.props;
+
+// Resolve article ids back to full entries for rendering.
+const all = await getTutorials();
+const byId = new Map(all.map((t) => [t.id, t]));
+const posts = articles.map((id: string) => byId.get(id)).filter(Boolean);
+
+const labels: Record<string, string> = { category: "Category", topic: "Topic", sub: "Sub-topic" };
+---
+
+<BaseLayout
+  title={`${heading} | Vaibhav Tripathi`}
+  description={`Articles on ${heading}.`}
+>
+  <main class="container">
+    <section class="browse-head">
+      <nav class="bc" aria-label="Breadcrumb">
+        <a href="/tutorials">Articles</a>
+        {crumbs.map((c: any, i: number) => (
+          <>
+            <span>›</span>
+            {i === crumbs.length - 1 ? <span>{c.name}</span> : <a href={c.href}>{c.name}</a>}
+          </>
+        ))}
+      </nav>
+      <h1>{heading}</h1>
+      <p class="lede">{labels[level]} · {posts.length} {posts.length === 1 ? "article" : "articles"}</p>
+
+      {tiles.length > 0 && (
+        <div class="tile-grid">
+          {tiles.map((t: any) => (
+            <a class="tile" href={t.href}>
+              <span>{t.name}</span>
+              <small>{t.count}</small>
+            </a>
+          ))}
+        </div>
+      )}
+
+      {chips.length > 0 && (
+        <div class="subchips">
+          {chips.map((c: any) => <a href={c.href}>{c.name}</a>)}
+        </div>
+      )}
+    </section>
+
+    <section class="feed">
+      {posts.length === 0 ? (
+        <p class="empty">No articles here yet.</p>
+      ) : (
+        posts.map((t: any, i: number) => <PostRow tutorial={t} first={i === 0} />)
+      )}
+    </section>
+  </main>
+</BaseLayout>

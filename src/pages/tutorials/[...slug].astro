@@ -1,0 +1,62 @@
+---
+import { getCollection, render } from "astro:content";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { slugify } from "../../consts.ts";
+
+export async function getStaticPaths() {
+  const tutorials = await getCollection("tutorials");
+  return tutorials.map((tutorial) => ({
+    params: { slug: tutorial.id },
+    props: { tutorial },
+  }));
+}
+
+const { tutorial } = Astro.props;
+const { Content } = await render(tutorial);
+const { title, description, pubDate, updatedDate, category, topic, subtopic, heroImage } =
+  tutorial.data;
+
+const catSlug = slugify(category);
+const topicSlug = slugify(topic);
+const dateFmt = (d: Date) =>
+  d.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+---
+
+<BaseLayout
+  title={`${title} | Vaibhav Tripathi`}
+  description={description}
+  image={heroImage}
+  type="article"
+  publishedDate={pubDate}
+>
+  <article class="article">
+    <header class="article-head">
+      <nav class="bc" aria-label="Breadcrumb">
+        <a href={`/topics/${catSlug}`}>{category}</a>
+        <span>›</span>
+        <a href={`/topics/${catSlug}/${topicSlug}`}>{topic}</a>
+        {subtopic && (
+          <>
+            <span>›</span>
+            <a href={`/topics/${catSlug}/${topicSlug}/${slugify(subtopic)}`}>{subtopic}</a>
+          </>
+        )}
+      </nav>
+      <h1>{title}</h1>
+      <div class="article-meta">
+        Published {dateFmt(pubDate)}
+        {updatedDate && <> · Updated {dateFmt(updatedDate)}</>}
+      </div>
+    </header>
+
+    <div class="ad-slot" data-ad-slot="article-top"></div>
+
+    <div class="prose">
+      <Content />
+    </div>
+
+    <div class="ad-slot" data-ad-slot="article-bottom"></div>
+
+    <p style="margin-top:40px"><a class="back-link" href="/tutorials">← All articles</a></p>
+  </article>
+</BaseLayout>

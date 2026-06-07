@@ -1,0 +1,93 @@
+---
+// Top bar + Browse mega-menu. The menu is built from real content (only
+// categories/topics/sub-topics that have articles appear), rendered on the
+// server for SEO, and toggled/​switched by a small inline script.
+import { SITE_TITLE } from "../consts.ts";
+import { buildMenu } from "../lib/taxonomy.ts";
+
+const menu = await buildMenu();
+---
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand2" href="/">{SITE_TITLE}</a>
+    <div class="topnav">
+      {menu.length > 0 && (
+        <button class="browse-btn" id="browseBtn" aria-expanded="false" aria-controls="mega">
+          Browse <span class="caret">▾</span>
+        </button>
+      )}
+      <a href="/tutorials">Articles</a>
+      <a href="/about">About</a>
+    </div>
+  </div>
+
+  {menu.length > 0 && (
+    <div class="mega" id="mega">
+      <div class="mega-inner">
+        <div class="cat-list" id="catList">
+          {menu.map((cat, i) => (
+            <button class={`cat-item${i === 0 ? " active" : ""}`} data-idx={i} type="button">
+              <span>{cat.name}</span><small>{cat.count}</small>
+            </button>
+          ))}
+        </div>
+        <div id="panels">
+          {menu.map((cat, i) => (
+            <div class={`panel${i === 0 ? " active" : ""}`} data-idx={i}>
+              <div class="panel-head">{cat.name} — topics</div>
+              <div class="topic-cols">
+                {cat.topics.map((tp) => (
+                  <div class="topic">
+                    <a class="topic-link" href={`/topics/${cat.slug}/${tp.slug}`}>{tp.name}</a>
+                    {tp.subs.length > 0 && (
+                      <div class="subs">
+                        {tp.subs.map((s) => (
+                          <a href={`/topics/${cat.slug}/${tp.slug}/${s.slug}`}>{s.name}</a>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )}
+</header>
+
+<script>
+  const btn = document.getElementById("browseBtn");
+  const mega = document.getElementById("mega");
+  const catList = document.getElementById("catList");
+
+  if (btn && mega) {
+    const setOpen = (open: boolean) => {
+      mega.classList.toggle("open", open);
+      btn.setAttribute("aria-expanded", String(open));
+    };
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      setOpen(!mega.classList.contains("open"));
+    });
+    document.addEventListener("click", (e) => {
+      if (!mega.contains(e.target as Node) && e.target !== btn) setOpen(false);
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") setOpen(false);
+    });
+  }
+
+  // Hovering a category swaps the visible topic panel.
+  catList?.addEventListener("mouseover", (e) => {
+    const item = (e.target as HTMLElement).closest(".cat-item") as HTMLElement | null;
+    if (!item) return;
+    const idx = item.dataset.idx;
+    document.querySelectorAll(".cat-item").forEach((x) => x.classList.remove("active"));
+    document.querySelectorAll(".panel").forEach((x) => x.classList.remove("active"));
+    item.classList.add("active");
+    document.querySelector(`.panel[data-idx="${idx}"]`)?.classList.add("active");
+  });
+</script>
