@@ -1,0 +1,686 @@
+  <section id="shift">
+    <span class="sec-num">Section 01</span>
+    <h2 class="sec">The declarative shift</h2>
+    <p>The foundation under everything: a Compose UI is not a set of objects you create and mutate. You write a <strong>function that describes</strong> what the UI should look like <em>for the current data</em>. When the data changes, Compose <strong>re-runs the function</strong> and works out what actually changed on screen. That re-run is called <strong>recomposition</strong>.</p>
+    <figure>
+      <svg viewBox="0 0 880 200" xmlns="http://www.w3.org/2000/svg" font-family="JetBrains Mono, monospace">
+        <text x="30" y="34" font-family="Fraunces, serif" font-size="18" font-weight="600" fill="#16181d">Describe, then re-run — not create, then mutate</text>
+        <rect x="40" y="56" width="800" height="58" rx="5" fill="#f6f8fa" stroke="#c8d0da"/>
+        <text x="60" y="80" font-size="13" font-weight="600" fill="#2c6e8f">You write:</text>
+        <text x="170" y="80" font-size="13" fill="#444a52">Text(message)  — "there is a Text showing `message`"</text>
+        <text x="60" y="102" font-size="12.5" fill="#828a93">a description of UI for the current value of `message`</text>
+
+        <rect x="40" y="126" width="800" height="58" rx="5" fill="#f4f0f8" stroke="#d8c8e6"/>
+        <text x="60" y="150" font-size="13" font-weight="600" fill="#7a3e9d">message changes →</text>
+        <text x="220" y="150" font-size="13" fill="#444a52">Compose RE-RUNS your function (recomposition)</text>
+        <text x="60" y="172" font-size="12.5" fill="#828a93">and diffs the result; you never hold or mutate a view object</text>
+      </svg>
+      <figcaption>Fig 1 · The describe-and-rerun model that recomposition is built on</figcaption>
+    </figure>
+    <div class="box key">
+      <span class="lab">The one idea to carry forward</span>
+      <p>Compose has fine-grained <em>"only update what changed"</em> built into its core: when a composable <strong>reads</strong> a piece of state, Compose records the dependency; when that state is <strong>written</strong>, only the composables that read it recompose — and stable composables whose inputs didn't change are <strong>skipped</strong> entirely. This always-on change detection is why the list APIs look the way they do — change is detected automatically, never announced.</p>
+    </div>
+  </section>
+
+  <!-- 2. LAZY -->
+  <section id="lazy">
+    <span class="sec-num">Section 02</span>
+    <h2 class="sec">Why "Lazy" — a recipe, not a loop</h2>
+    <p>Compose's <code>Column</code> stacks children vertically, so the naive approach is to loop your data into one:</p>
+    <pre><code>Column(Modifier.verticalScroll(rememberScrollState())) {
+    items.forEach { item -> MessageRow(item) }   <span class="tok-cmt">// runs NOW, for every item</span>
+}</code></pre>
+    <p>This composes <strong>all</strong> children up front. For 100,000 items that means 100,000 composables built, measured, and placed immediately — memory and time blow up. The fix is the same core trick any virtualized list uses: <strong>only do work for what's visible.</strong> That is what <strong>Lazy</strong> means.</p>
+    <figure>
+      <svg viewBox="0 0 880 150" xmlns="http://www.w3.org/2000/svg" font-family="JetBrains Mono, monospace">
+        <rect x="40" y="36" width="380" height="86" rx="5" fill="#fbf1ef" stroke="#e9c4bb"/>
+        <text x="230" y="62" font-size="13" font-weight="600" fill="#b5341f" text-anchor="middle">Column — EAGER</text>
+        <text x="230" y="86" font-size="12" fill="#444a52" text-anchor="middle">composes every child up front</text>
+        <text x="230" y="106" font-size="12" fill="#444a52" text-anchor="middle">100k composables built → 💥</text>
+
+        <rect x="460" y="36" width="380" height="86" rx="5" fill="#eef5f8" stroke="#c2dae6"/>
+        <text x="650" y="62" font-size="13" font-weight="600" fill="#2c6e8f" text-anchor="middle">LazyColumn — LAZY</text>
+        <text x="650" y="86" font-size="12" fill="#444a52" text-anchor="middle">composes only items in/near viewport</text>
+        <text x="650" y="106" font-size="12" fill="#444a52" text-anchor="middle">~10 composables built → smooth</text>
+      </svg>
+      <figcaption>Fig 2 · Eager vs lazy — the difference between building all and building visible</figcaption>
+    </figure>
+
+    <h4>items() is a recipe, invoked on demand</h4>
+    <pre><code>LazyColumn {
+    items(messages) { message ->     <span class="tok-cmt">// NOT messages.forEach</span>
+        MessageRow(message)
+    }
+}</code></pre>
+    <p><code>items(messages) { … }</code> does <strong>not</strong> run your <code>MessageRow</code> lambda for every message right away. It <em>registers</em> "here are N items and here is how to produce content for item <code>i</code>, <strong>when asked</strong>." The lambda is then invoked lazily, per item, as the viewport needs it.</p>
+    <div class="summary"><strong>The content lambda is a recipe for "how to compose item i", called on demand</strong> — exactly when an item is about to become visible, and never for items far outside the viewport. That single property is what makes <code>LazyColumn</code> lazy.</div>
+  </section>
+
+  <!-- 3. DISPOSE -->
+  <section id="dispose">
+    <span class="sec-num">Section 03</span>
+    <h2 class="sec">The disposal model</h2>
+    <p>When an item scrolls out of the viewport, its composition is <strong>disposed</strong> — discarded. Off-screen items are not kept around; scroll one back in and it is composed <strong>fresh</strong>.</p>
+    <figure>
+      <svg viewBox="0 0 880 160" xmlns="http://www.w3.org/2000/svg" font-family="JetBrains Mono, monospace">
+        <rect x="30" y="50" width="180" height="62" rx="5" fill="#eef5f8" stroke="#2c6e8f"/>
+        <text x="120" y="78" font-size="12.5" font-weight="600" fill="#2c6e8f" text-anchor="middle">scrolls IN</text>
+        <text x="120" y="98" font-size="11" fill="#444a52" text-anchor="middle">composed (fn runs)</text>
+        <rect x="350" y="50" width="180" height="62" rx="5" fill="#f6f8fa" stroke="#c8d0da"/>
+        <text x="440" y="78" font-size="12.5" font-weight="600" fill="#444a52" text-anchor="middle">visible</text>
+        <text x="440" y="98" font-size="11" fill="#444a52" text-anchor="middle">recomposes on change</text>
+        <rect x="670" y="50" width="180" height="62" rx="5" fill="#fbf1ef" stroke="#b5341f"/>
+        <text x="760" y="78" font-size="12.5" font-weight="600" fill="#b5341f" text-anchor="middle">scrolls OUT</text>
+        <text x="760" y="98" font-size="11" fill="#444a52" text-anchor="middle">DISPOSED (discarded)</text>
+        <g stroke="#828a93" stroke-width="1.5" fill="none">
+          <path d="M210 81 L346 81" marker-end="url(#a3)"/>
+          <path d="M530 81 L666 81" marker-end="url(#a3)"/>
+        </g>
+        <defs><marker id="a3" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#828a93"/></marker></defs>
+      </svg>
+      <figcaption>Fig 3 · The item lifecycle — composed on entry, disposed on exit</figcaption>
+    </figure>
+    <p>Why can Compose afford to throw work away and rebuild it? Because <strong>a composable is not a heavy object.</strong> "Composing an item" means running a function that emits lightweight nodes into Compose's internal tree (the slot table) — there is no markup to parse and no deep object tree to allocate. Creating and discarding those nodes is cheap enough that rebuilding on demand is a non-issue.</p>
+    <div class="box cmp">
+      <span class="lab">Critical to know · the honest refinement</span>
+      <p>The <em>composition</em> is disposed, but Compose does internally reuse the lower-level <strong>layout-node shells</strong> as a performance optimization — a thin, invisible reuse that carries no data across (no field cache, no create/bind split). You never tune or see it in normal code; it only surfaces in rare framework bugs around stale animation state on reused nodes. So node-reuse exists, but it lives <em>below</em> the layer you write — it is not something you manage.</p>
+    </div>
+  </section>
+
+  <!-- 4. STATE -->
+  <section id="state">
+    <span class="sec-num">Section 04</span>
+    <h2 class="sec">Where state lives — does it survive disposal?</h2>
+    <p>Because items are disposed, <strong>you</strong> decide what survives by deciding <em>where state lives</em>. This is the single most practical consequence of the disposal model.</p>
+    <figure>
+      <svg viewBox="0 0 880 210" xmlns="http://www.w3.org/2000/svg" font-family="JetBrains Mono, monospace">
+        <rect x="40" y="30" width="800" height="46" rx="5" fill="#eef5f8" stroke="#2e7d4f"/>
+        <text x="60" y="58" font-size="13" font-weight="600" fill="#2e7d4f">DURABLE — hoisted OUT of the list</text>
+        <text x="470" y="58" font-size="12.5" fill="#444a52">ViewModel / rememberSaveable</text>
+
+        <rect x="40" y="88" width="800" height="46" rx="5" fill="#fbf1ef" stroke="#e9c4bb"/>
+        <text x="60" y="116" font-size="13" font-weight="600" fill="#b5341f">EPHEMERAL — remember{} INSIDE the item</text>
+        <text x="470" y="116" font-size="12.5" fill="#444a52">dies on disposal (scroll-off)</text>
+
+        <text x="40" y="166" font-size="12.5" fill="#444a52">Rule: state that must survive scroll-off → hoist OUT.</text>
+        <text x="40" y="188" font-size="12.5" fill="#444a52">State that's fine to lose (a row's expanded toggle) → keep it in the item.</text>
+      </svg>
+      <figcaption>Fig 4 · The placement decision is the survival decision</figcaption>
+    </figure>
+    <pre><code>@Composable
+fun PostRow(post: Post) {
+    <span class="tok-cmt">// EPHEMERAL — dies when the row is disposed. Fine to lose.</span>
+    <span class="tok-key">var</span> expanded <span class="tok-key">by</span> remember { mutableStateOf(false) }
+    ...
+}
+
+<span class="tok-cmt">// DURABLE — the post DATA lives in the ViewModel, above the list:</span>
+class FeedViewModel : ViewModel() {
+    <span class="tok-key">var</span> posts <span class="tok-key">by</span> mutableStateOf(initialPosts)
+        <span class="tok-key">private set</span>
+}</code></pre>
+    <div class="box warn">
+      <span class="lab">remember{} vs rememberSaveable</span>
+      <p>A plain <code>remember{}</code> is tied to the composition — disposed when the item leaves. <code>rememberSaveable</code> survives disposal <em>and</em> process death (it persists to the saved-state bundle). For anything that must outlive scroll-off, either use <code>rememberSaveable</code> or hoist the value into the ViewModel.</p>
+    </div>
+  </section>
+
+  <!-- 5. KEY -->
+  <section id="key">
+    <span class="sec-num">Section 05</span>
+    <h2 class="sec">key — stable identity</h2>
+    <p>By default <code>LazyColumn</code> identifies each item slot by its <strong>position</strong> (0, 1, 2…). That is fine until items move. Insert a new item at the top and every position now holds different data, so Compose — tracking by index — thinks <em>every slot changed</em>, recomposes them all, and misattributes any item-local state to the wrong entity.</p>
+    <figure>
+      <svg viewBox="0 0 880 200" xmlns="http://www.w3.org/2000/svg" font-family="JetBrains Mono, monospace">
+        <text x="30" y="28" font-size="12" fill="#828a93">INSERT "New" at the top — tracked by INDEX (default)</text>
+        <g font-size="12" fill="#444a52">
+          <rect x="40" y="40" width="150" height="26" fill="#f6f8fa" stroke="#c8d0da"/><text x="52" y="58">0: Post A</text>
+          <rect x="40" y="70" width="150" height="26" fill="#f6f8fa" stroke="#c8d0da"/><text x="52" y="88">1: Post B</text>
+          <rect x="40" y="100" width="150" height="26" fill="#f6f8fa" stroke="#c8d0da"/><text x="52" y="118">2: Post C</text>
+        </g>
+        <text x="230" y="92" font-size="22" fill="#828a93">→</text>
+        <g font-size="12" fill="#b5341f">
+          <rect x="280" y="40" width="170" height="26" fill="#fbf1ef" stroke="#e9c4bb"/><text x="292" y="58">0: New  (was A's slot)</text>
+          <rect x="280" y="70" width="170" height="26" fill="#fbf1ef" stroke="#e9c4bb"/><text x="292" y="88">1: A    (was B's slot)</text>
+          <rect x="280" y="100" width="170" height="26" fill="#fbf1ef" stroke="#e9c4bb"/><text x="292" y="118">2: B    (was C's slot)</text>
+        </g>
+        <text x="480" y="60" font-size="12.5" fill="#444a52">"every slot changed" →</text>
+        <text x="480" y="80" font-size="12.5" fill="#444a52">recompose all + Post A inherits</text>
+        <text x="480" y="100" font-size="12.5" fill="#b5341f" font-weight="600">slot 1's old (B's) state. WRONG.</text>
+      </svg>
+      <figcaption>Fig 5 · Index tracking misattributes state on insert/reorder</figcaption>
+    </figure>
+    <p>Give each item its real entity identity with <code>key</code>, and Compose tracks by that instead of position:</p>
+    <pre><code>items(
+    items = posts,
+    key = { post -> post.id }   <span class="tok-arrow">// stable identity, not index</span>
+) { post -> PostRow(post) }</code></pre>
+    <p>Now an insert is understood correctly: <em>"id 1 still exists, it just moved from slot 0 to slot 1 — keep its state and composition; only the new id is composed fresh."</em> State stays attached to the right entity, and only genuinely-new items are built.</p>
+    <div class="box key">
+      <span class="lab">The two questions — one is automatic</span>
+      <p><code>key</code> answers <strong>"which entity is this?"</strong> (identity). The second question — <strong>"did its contents change, so does it need updating?"</strong> — you write <em>nothing</em> for: it is answered automatically by recomposition + stability. Stable inputs that didn't change are skipped; changed ones recompose. You supply identity; Compose handles change-detection.</p>
+    </div>
+    <h4>Rules</h4>
+    <ul>
+      <li><strong>Unique &amp; stable</strong> within the list. Duplicate keys crash at runtime; a key that changes for the same entity defeats the purpose. Use a real id, never the index.</li>
+      <li><strong>Saveable-compatible</strong> (String/Long id) if state should survive configuration changes.</li>
+      <li><strong>Optional for static lists</strong> that never reorder/insert — but essentially mandatory for any dynamic list. It is the single most impactful correctness line in a LazyColumn.</li>
+    </ul>
+  </section>
+
+  <!-- 6. UPDATE -->
+  <section id="update">
+    <span class="sec-num">Section 06</span>
+    <h2 class="sec">Updating a list: reassign, never mutate</h2>
+    <p>This is a hard correctness rule, not a style choice. Compose has <strong>no "announce a change" call</strong> — there is no API where you tell it a particular item updated. The <em>only</em> way Compose learns something changed is by observing a <strong>write to a State object that something read.</strong></p>
+    <figure>
+      <svg viewBox="0 0 880 170" xmlns="http://www.w3.org/2000/svg" font-family="JetBrains Mono, monospace">
+        <rect x="40" y="34" width="800" height="48" rx="5" fill="#eef5f8" stroke="#2e7d4f"/>
+        <text x="60" y="55" font-size="13" font-weight="600" fill="#2e7d4f">posts = posts.map { … }</text>
+        <text x="360" y="55" font-size="12.5" fill="#444a52">WRITE to State `posts` → observed → recomposes ✓</text>
+        <text x="60" y="73" font-size="11.5" fill="#828a93">new list of references — 1 new object, rest shared</text>
+
+        <rect x="40" y="96" width="800" height="48" rx="5" fill="#fbf1ef" stroke="#e9c4bb"/>
+        <text x="60" y="117" font-size="13" font-weight="600" fill="#b5341f">posts[0].likes++</text>
+        <text x="360" y="117" font-size="12.5" fill="#444a52">no write to State → invisible → UI does NOT update ✗</text>
+        <text x="60" y="135" font-size="11.5" fill="#828a93">not slower — silently broken</text>
+      </svg>
+      <figcaption>Fig 6 · Reassigning the State is the signal; mutating a field inside is a no-op</figcaption>
+    </figure>
+    <div class="box crit">
+      <span class="lab">Why this is not wasteful</span>
+      <p>Creating a new <em>list</em> is not re-rendering every <em>row</em>. <code>posts.map { if (match) it.copy(...) else it }</code> allocates <strong>one</strong> new object; the other 99,999 are the <em>same references</em>. Compose then compares each visible item by reference — unchanged references are <strong>skipped</strong> (stability), so exactly <strong>one</strong> row recomposes. You get the precise targeted update, and Compose computes <em>which</em> row from the data instead of you announcing it.</p>
+    </div>
+    <h4>Making a field its own State — valid, but wrong for list data</h4>
+    <p>You <em>can</em> make a field observable (<code>var likes by mutableStateOf(...)</code>) so <code>post.likes++</code> updates the UI. It works and is surgical. But for <strong>list</strong> data it is the wrong tool: it bypasses <code>key</code>-based structural diffing and animations (they compare list structure, which an in-place mutation doesn't change), it scatters your source of truth across live objects (fighting unidirectional data flow and any Flow/Room/network layer that emits fresh lists), and it is awkward to persist. Use immutable data + list reassignment for lists; reserve field-state for genuinely standalone, long-lived, non-structural entities.</p>
+    <div class="summary">In Compose, <strong>"reassign a new list" is the only observable path</strong>, and stability ensures it still updates just the one changed row. Mutation is not a faster version of the same thing — it is a silent no-op that breaks the UI.</div>
+  </section>
+
+  <!-- 7. ANIMATE -->
+  <section id="animate">
+    <span class="sec-num">Section 07</span>
+    <h2 class="sec">Item animations</h2>
+    <p>Animation is the payoff of <code>key</code>. To slide an item from its old position to a new one, Compose must know it is the <em>same</em> item — and identity is exactly what <code>key</code> provides. <strong>Without keys, item animations don't work</strong>, because Compose can't tell a move from a content swap.</p>
+    <pre><code>items(items = posts, key = { it.id }) { post ->
+    PostRow(post, modifier = Modifier.animateItem())   <span class="tok-arrow">// on the item's TOP-LEVEL composable</span>
+}</code></pre>
+    <figure>
+      <svg viewBox="0 0 880 130" xmlns="http://www.w3.org/2000/svg" font-family="JetBrains Mono, monospace">
+        <rect x="40" y="34" width="250" height="62" rx="5" fill="#eef5f8" stroke="#2c6e8f"/>
+        <text x="165" y="60" font-size="12.5" font-weight="600" fill="#2c6e8f" text-anchor="middle">appearance</text>
+        <text x="165" y="80" font-size="11" fill="#444a52" text-anchor="middle">fade in (item added)</text>
+        <rect x="315" y="34" width="250" height="62" rx="5" fill="#f4f0f8" stroke="#d8c8e6"/>
+        <text x="440" y="60" font-size="12.5" font-weight="600" fill="#7a3e9d" text-anchor="middle">disappearance</text>
+        <text x="440" y="80" font-size="11" fill="#444a52" text-anchor="middle">fade out (item removed)</text>
+        <rect x="590" y="34" width="250" height="62" rx="5" fill="#eef9f0" stroke="#2e7d4f"/>
+        <text x="715" y="60" font-size="12.5" font-weight="600" fill="#2e7d4f" text-anchor="middle">reordering</text>
+        <text x="715" y="80" font-size="11" fill="#444a52" text-anchor="middle">slide to new spot (moved)</text>
+      </svg>
+      <figcaption>Fig 7 · Modifier.animateItem() covers all three at once</figcaption>
+    </figure>
+    <p>The modern modifier is <code>Modifier.animateItem()</code> (it replaced the deprecated <code>animateItemPlacement()</code>, which only did placement). It handles all three transition types — customize each via <code>fadeIn</code>, <code>fadeOut</code>, and <code>placementSpec</code> parameters (e.g. a <code>tween()</code> or <code>spring()</code>), or take the sensible defaults with no arguments.</p>
+    <div class="box key">
+      <span class="lab">Animates on data change, not on scroll</span>
+      <p>The animations play only at genuine insertion / removal / reorder of the data set — <strong>not</strong> when an item merely scrolls into view (even though that item is freshly composed). Compose distinguishes "newly part of the list" from "scrolled on screen," so you don't get a fade every time you scroll.</p>
+    </div>
+  </section>
+
+  <!-- 8. MEASURE -->
+  <section id="measure">
+    <span class="sec-num">Section 08</span>
+    <h2 class="sec">The measure &amp; layout phase</h2>
+    <p>Every Compose frame runs three phases in order. Crucially, <strong>composition (what exists) and layout (size &amp; position) are separate phases</strong>.</p>
+    <figure>
+      <svg viewBox="0 0 880 110" xmlns="http://www.w3.org/2000/svg" font-family="JetBrains Mono, monospace">
+        <rect x="40" y="34" width="250" height="50" rx="5" fill="#f4f0f8" stroke="#d8c8e6"/>
+        <text x="165" y="56" font-size="13" font-weight="600" fill="#7a3e9d" text-anchor="middle">1 · COMPOSITION</text>
+        <text x="165" y="74" font-size="11" fill="#444a52" text-anchor="middle">run fns → emit node tree</text>
+        <rect x="315" y="34" width="250" height="50" rx="5" fill="#eef5f8" stroke="#c2dae6"/>
+        <text x="440" y="56" font-size="13" font-weight="600" fill="#2c6e8f" text-anchor="middle">2 · LAYOUT</text>
+        <text x="440" y="74" font-size="11" fill="#444a52" text-anchor="middle">measure each, then place</text>
+        <rect x="590" y="34" width="250" height="50" rx="5" fill="#eef9f0" stroke="#bfe0cb"/>
+        <text x="715" y="56" font-size="13" font-weight="600" fill="#2e7d4f" text-anchor="middle">3 · DRAWING</text>
+        <text x="715" y="74" font-size="11" fill="#444a52" text-anchor="middle">paint placed nodes</text>
+        <g stroke="#828a93" stroke-width="1.5" fill="none">
+          <path d="M290 59 L313 59" marker-end="url(#a8)"/><path d="M565 59 L588 59" marker-end="url(#a8)"/>
+        </g>
+        <defs><marker id="a8" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#828a93"/></marker></defs>
+      </svg>
+      <figcaption>Fig 8 · The three phases — layout (phase 2) is where measure happens</figcaption>
+    </figure>
+    <h4>How a lazy list measures</h4>
+    <p>LazyColumn's layout phase walks a fill loop: keep a pointer, compose-and-measure the next item, place it, advance, and <strong>stop when the viewport is full</strong>. Items below the fold are never composed or measured.</p>
+    <pre><code>pointer = 0
+<span class="tok-key">while</span> (pointer &lt; viewportHeight &amp;&amp; more items) {
+    compose item at index   <span class="tok-cmt">// only if not already composed (lazy)</span>
+    measure it              <span class="tok-cmt">// "how tall are you?" — the measure cost</span>
+    place it at pointer
+    pointer += itemHeight
+}
+<span class="tok-cmt">// stop when viewport full → items below are never composed/measured</span></code></pre>
+
+    <h4>Single-pass measurement</h4>
+    <p>Compose enforces an architectural rule: <strong>a composable may measure each child only once per layout pass.</strong> Re-measuring a child within a pass is forbidden by the API. This means deep nesting does <em>not</em> multiply measure passes — a structural guarantee, not an optimization.</p>
+    <div class="box cmp">
+      <span class="lab">Why this matters · a real architectural win</span>
+      <p>In older layout systems a parent could measure a child, inspect the result, then measure it again with new constraints — and nesting such layouts <strong>multiplied</strong> the passes (a weighted layout inside a self-sizing one could hit four measure passes per row), a leading cause of scroll jank. Compose makes that multiplication <strong>impossible by design</strong>, so deeply nested rows don't blow up into exponential measurement. Aggressively flattening layouts — once essential — is far less of a concern here.</p>
+    </div>
+    <div class="box warn">
+      <span class="lab">The bounded exception — intrinsics</span>
+      <p><code>IntrinsicSize.Min/Max</code> (e.g. "make all items as tall as the tallest") triggers one extra measurement pass for that subtree. But it is <strong>visible</strong> (the <code>IntrinsicSize</code> is right there in your code), <strong>bounded</strong> (+1 pass, not compounding), and <strong>opt-in</strong> — the opposite of the invisible, multiplying View trap.</p>
+    </div>
+    <h4>Variable heights — an inherent trade-off</h4>
+    <p>Because only visible items are measured, total content height is unknown — so the scroll extent is <strong>estimated</strong> (a slightly imprecise scrollbar), and the pixel-exact offset of a far item isn't known until reached. <code>scrollToItem(index)</code> is still precise (it composes up to that item). This is the price of lazy measurement, identical in spirit to any virtualized list.</p>
+  </section>
+
+  <!-- 9. SKIPPABLE -->
+  <section id="skippable">
+    <span class="sec-num">Section 09</span>
+    <h2 class="sec">Performance: keep composables skippable</h2>
+    <p>The hot path in a list is <strong>recomposition</strong>. The core discipline is to keep item composables <strong>skippable</strong>, so Compose re-runs them only when their inputs actually changed. Skippability depends on <strong>stability</strong>.</p>
+    <h4>(a) Stable item types</h4>
+    <pre><code><span class="tok-key">data class</span> Post(<span class="tok-key">val</span> id: Long, <span class="tok-key">val</span> author: String, <span class="tok-key">val</span> likes: Int)
+<span class="tok-cmt">// all val + primitive/String → STABLE → PostRow is skippable ✓</span>
+
+<span class="tok-key">data class</span> Post(... <span class="tok-key">var</span> likes ...)              <span class="tok-cmt">// UNSTABLE → re-runs every time ✗</span>
+<span class="tok-key">data class</span> Post(... <span class="tok-key">val</span> tags: List&lt;String&gt; ...)  <span class="tok-cmt">// UNSTABLE (List is an interface)</span>
+<span class="tok-cmt">//   → use kotlinx ImmutableList, or annotate the class @Immutable</span></code></pre>
+    <h4>(b) Stable lambdas</h4>
+    <p>A lambda that captures a value can be a <em>new object</em> each recomposition, making an item see "a param changed" and re-run needlessly. Prefer stable references — pass <code>post.id</code> plus a stable <code>onLike: (Long) -&gt; Unit</code> rather than a fresh capturing lambda per item where it matters.</p>
+    <h4>(c) No heavy work in the body</h4>
+    <p>Anything expensive inside the composable runs on every non-skipped recomposition. Wrap it in <code>remember</code> so it computes once (recalling: <code>remember</code> dies on disposal, so truly durable results hoist out).</p>
+    <div class="box key">
+      <span class="lab">Diagnose, don't guess</span>
+      <p>The <strong>Compose Compiler Reports</strong> and <strong>Layout Inspector</strong> tell you exactly which composables are skippable and which parameters are unstable — the equivalent of profiling your hot path. Use them before optimizing.</p>
+    </div>
+  </section>
+
+  <!-- 10. CONTENTTYPE -->
+  <section id="contenttype">
+    <span class="sec-num">Section 10</span>
+    <h2 class="sec">contentType &amp; nested lists</h2>
+    <p>When a list mixes <strong>kinds</strong> of items (header, normal row, ad), tell Compose which kind each is via <code>contentType</code>. The internal node-reuse then reuses a shell from a same-kind item rather than a mismatched one, reducing churn.</p>
+    <pre><code>LazyColumn {
+    item { Header() }
+    items(posts, key = { it.id }, contentType = { "post" }) { PostRow(it) }
+    items(ads,   key = { it.id }, contentType = { "ad"   }) { AdRow(it)   }
+}</code></pre>
+    <p>In a <strong>uniform</strong> list (all <code>PostRow</code>) you can skip it — Compose already knows the items are the same kind. It earns its keep in <strong>heterogeneous</strong> lists.</p>
+    <div class="box warn">
+      <span class="lab">Nested lazy lists — preserve inner scroll state</span>
+      <p>A <code>LazyColumn</code> of horizontal <code>LazyRow</code>s works, but each inner row's scroll position lives in a <code>rememberLazyListState()</code>. If that state isn't hoisted/keyed correctly, the inner row <strong>forgets its scroll position</strong> when the outer item recomposes or scrolls off and back. This is the disposal theme again: in nested lists, the practical problem is making inner scroll state <em>survive</em>.</p>
+    </div>
+  </section>
+
+  <!-- 11. GRIDS -->
+  <section id="grids">
+    <span class="sec-num">Section 11</span>
+    <h2 class="sec">Grids &amp; Staggered</h2>
+    <p>Same lazy engine, different layout geometry. You pick the geometry by choosing the composable.</p>
+
+    <h3>LazyVerticalGrid — aligned rows</h3>
+    <p>Lays N cells across, then advances; rows are aligned.</p>
+    <pre><code>LazyVerticalGrid(
+    columns = GridCells.Fixed(3),            <span class="tok-cmt">// exactly 3 columns</span>
+    horizontalArrangement = Arrangement.spacedBy(8.dp),
+    verticalArrangement = Arrangement.spacedBy(8.dp)
+) {
+    items(photos, key = { it.id }) { PhotoCell(it, Modifier.animateItem()) }
+}</code></pre>
+    <table>
+      <thead><tr><th>GridCells</th><th>Behaviour</th></tr></thead>
+      <tbody>
+        <tr><td><code>GridCells.Fixed(3)</code></td><td>exactly 3 columns</td></tr>
+        <tr><td><code>GridCells.Adaptive(120.dp)</code></td><td>as many columns as fit at ≥120dp each — responsive, no manual math</td></tr>
+      </tbody>
+    </table>
+    <p>A single item can span the full width (e.g. a header):</p>
+    <pre><code>item(span = { GridItemSpan(maxLineSpan) }) { Header() }   <span class="tok-cmt">// spans all columns</span></code></pre>
+
+    <figure>
+      <svg viewBox="0 0 880 330" xmlns="http://www.w3.org/2000/svg" font-family="JetBrains Mono, monospace">
+        <text x="30" y="24" font-size="12" fill="#828a93">Same item list, three column strategies — how it actually renders on a phone</text>
+
+        <!-- Phone 1: Fixed(2) -->
+        <rect x="40" y="44" width="230" height="250" rx="14" fill="#f6f8fa" stroke="#c8d0da" stroke-width="2"/>
+        <text x="155" y="68" font-size="12.5" font-weight="600" fill="#2c6e8f" text-anchor="middle">GridCells.Fixed(2)</text>
+        <!-- header span -->
+        <rect x="56" y="80" width="198" height="26" rx="3" fill="#e0d4ee" stroke="#7a3e9d"/><text x="155" y="98" font-size="10" fill="#7a3e9d" text-anchor="middle">header — span(maxLineSpan)</text>
+        <!-- 2 cols -->
+        <g fill="#cfe6f0" stroke="#2c6e8f">
+          <rect x="56" y="114" width="95" height="55" rx="3"/><rect x="159" y="114" width="95" height="55" rx="3"/>
+          <rect x="56" y="177" width="95" height="55" rx="3"/><rect x="159" y="177" width="95" height="55" rx="3"/>
+          <rect x="56" y="240" width="95" height="46" rx="3"/><rect x="159" y="240" width="95" height="46" rx="3"/>
+        </g>
+        <text x="155" y="145" font-size="11" fill="#2c6e8f" text-anchor="middle">0</text><text x="207" y="145" font-size="11" fill="#2c6e8f" text-anchor="middle">1</text>
+        <text x="103" y="208" font-size="11" fill="#2c6e8f" text-anchor="middle">2</text><text x="207" y="208" font-size="11" fill="#2c6e8f" text-anchor="middle">3</text>
+
+        <!-- Phone 2: Fixed(3) -->
+        <rect x="325" y="44" width="230" height="250" rx="14" fill="#f6f8fa" stroke="#c8d0da" stroke-width="2"/>
+        <text x="440" y="68" font-size="12.5" font-weight="600" fill="#2c6e8f" text-anchor="middle">GridCells.Fixed(3)</text>
+        <rect x="341" y="80" width="198" height="26" rx="3" fill="#e0d4ee" stroke="#7a3e9d"/><text x="440" y="98" font-size="10" fill="#7a3e9d" text-anchor="middle">header — span(maxLineSpan)</text>
+        <g fill="#cfe6f0" stroke="#2c6e8f">
+          <rect x="341" y="114" width="62" height="55" rx="3"/><rect x="409" y="114" width="62" height="55" rx="3"/><rect x="477" y="114" width="62" height="55" rx="3"/>
+          <rect x="341" y="177" width="62" height="55" rx="3"/><rect x="409" y="177" width="62" height="55" rx="3"/><rect x="477" y="177" width="62" height="55" rx="3"/>
+          <rect x="341" y="240" width="62" height="46" rx="3"/><rect x="409" y="240" width="62" height="46" rx="3"/><rect x="477" y="240" width="62" height="46" rx="3"/>
+        </g>
+        <text x="372" y="145" font-size="10" fill="#2c6e8f" text-anchor="middle">0</text><text x="440" y="145" font-size="10" fill="#2c6e8f" text-anchor="middle">1</text><text x="508" y="145" font-size="10" fill="#2c6e8f" text-anchor="middle">2</text>
+        <text x="30" y="316" font-size="11" fill="#444a52">More columns = smaller cells, same data. Aligned rows in both.</text>
+
+        <!-- Phone 3: Adaptive -->
+        <rect x="610" y="44" width="230" height="250" rx="14" fill="#f6f8fa" stroke="#c8d0da" stroke-width="2"/>
+        <text x="725" y="68" font-size="12.5" font-weight="600" fill="#2c6e8f" text-anchor="middle">Adaptive(minSize)</text>
+        <rect x="626" y="80" width="198" height="26" rx="3" fill="#e0d4ee" stroke="#7a3e9d"/><text x="725" y="98" font-size="9.5" fill="#7a3e9d" text-anchor="middle">"fit as many ≥ minSize as I can"</text>
+        <g fill="#cfe6f0" stroke="#2c6e8f">
+          <rect x="626" y="114" width="95" height="50" rx="3"/><rect x="729" y="114" width="95" height="50" rx="3"/>
+          <rect x="626" y="172" width="95" height="50" rx="3"/><rect x="729" y="172" width="95" height="50" rx="3"/>
+        </g>
+        <text x="725" y="246" font-size="9.5" fill="#444a52" text-anchor="middle">2 cols on a narrow phone…</text>
+        <text x="725" y="262" font-size="9.5" fill="#444a52" text-anchor="middle">…4–5 on a tablet, automatically</text>
+      </svg>
+      <figcaption>Fig 9 · GridCells strategies — Fixed pins the column count, Adaptive derives it from width</figcaption>
+    </figure>
+
+    <h3>LazyVerticalStaggeredGrid — masonry</h3>
+    <p>Each column flows independently; each item drops into the currently-shortest column (Pinterest layout).</p>
+    <figure>
+      <svg viewBox="0 0 880 360" xmlns="http://www.w3.org/2000/svg" font-family="JetBrains Mono, monospace">
+        <text x="30" y="24" font-size="12" fill="#828a93">StaggeredGridCells.Fixed(2) — items of varying height pack into the shortest column</text>
+
+        <!-- phone frame -->
+        <rect x="300" y="40" width="280" height="300" rx="16" fill="#f6f8fa" stroke="#c8d0da" stroke-width="2"/>
+
+        <!-- column guides -->
+        <text x="372" y="64" font-size="10" fill="#828a93" text-anchor="middle">col 0</text>
+        <text x="508" y="64" font-size="10" fill="#828a93" text-anchor="middle">col 1</text>
+
+        <!-- col 0 -->
+        <rect x="318" y="72" width="120" height="96" rx="4" fill="#cfe6f0" stroke="#2c6e8f"/><text x="378" y="124" font-size="13" font-weight="600" fill="#2c6e8f" text-anchor="middle">0</text>
+        <rect x="318" y="176" width="120" height="60" rx="4" fill="#cfe6f0" stroke="#2c6e8f"/><text x="378" y="210" font-size="13" font-weight="600" fill="#2c6e8f" text-anchor="middle">3</text>
+        <rect x="318" y="244" width="120" height="84" rx="4" fill="#cfe6f0" stroke="#2c6e8f"/><text x="378" y="290" font-size="13" font-weight="600" fill="#2c6e8f" text-anchor="middle">4</text>
+
+        <!-- col 1 -->
+        <rect x="446" y="72" width="120" height="54" rx="4" fill="#d6efe0" stroke="#2e7d4f"/><text x="506" y="103" font-size="13" font-weight="600" fill="#2e7d4f" text-anchor="middle">1</text>
+        <rect x="446" y="134" width="120" height="100" rx="4" fill="#d6efe0" stroke="#2e7d4f"/><text x="506" y="188" font-size="13" font-weight="600" fill="#2e7d4f" text-anchor="middle">2</text>
+        <rect x="446" y="242" width="120" height="70" rx="4" fill="#d6efe0" stroke="#2e7d4f"/><text x="506" y="281" font-size="13" font-weight="600" fill="#2e7d4f" text-anchor="middle">5</text>
+
+        <!-- explanation right -->
+        <text x="610" y="92" font-size="11.5" fill="#444a52">Fill order 0→5:</text>
+        <text x="610" y="114" font-size="11" fill="#444a52">• 0 (tall) → col 0</text>
+        <text x="610" y="134" font-size="11" fill="#444a52">• 1 → col 1 (now shorter)</text>
+        <text x="610" y="154" font-size="11" fill="#444a52">• 2 → col 1 still shorter</text>
+        <text x="610" y="174" font-size="11" fill="#444a52">• 3 → col 0 catches up</text>
+        <text x="610" y="194" font-size="11" fill="#444a52">• 4 → col 0</text>
+        <text x="610" y="214" font-size="11" fill="#444a52">• 5 → col 1</text>
+        <text x="610" y="250" font-size="11" fill="#828a93">rows do NOT line up —</text>
+        <text x="610" y="268" font-size="11" fill="#828a93">each column's bottom edge</text>
+        <text x="610" y="286" font-size="11" fill="#828a93">is independent.</text>
+
+        <!-- explanation left -->
+        <text x="40" y="120" font-size="11.5" fill="#444a52">Each new item asks:</text>
+        <text x="40" y="142" font-size="11" fill="#2c6e8f">"which column is</text>
+        <text x="40" y="160" font-size="11" fill="#2c6e8f"> currently shortest?"</text>
+        <text x="40" y="184" font-size="11" fill="#444a52">…and drops in there.</text>
+        <text x="40" y="220" font-size="11" fill="#828a93">That single rule</text>
+        <text x="40" y="238" font-size="11" fill="#828a93">produces the</text>
+        <text x="40" y="256" font-size="11" fill="#828a93">masonry look.</text>
+      </svg>
+      <figcaption>Fig 10 · Staggered fills each item into the shortest column, so rows never align</figcaption>
+    </figure>
+    <pre><code>LazyVerticalStaggeredGrid(
+    columns = StaggeredGridCells.Fixed(2),
+    verticalItemSpacing = 8.dp,
+    horizontalArrangement = Arrangement.spacedBy(8.dp)
+) {
+    items(photos, key = { it.id }) { PhotoCell(it) }
+}</code></pre>
+    <div class="box warn">
+      <span class="lab">The cost staggered pays</span>
+      <p>Item position depends on every prior item's height, so the scroll extent is estimated, column re-shuffling can occur, and jumping to a far item isn't cheap. Inherent to masonry layouts — not specific to Compose.</p>
+    </div>
+  </section>
+
+  <!-- 12. PAGING -->
+  <section id="paging">
+    <span class="sec-num">Section 12</span>
+    <h2 class="sec">Big lists &amp; Paging 3</h2>
+    <p>For a bounded in-memory list, "big" is rarely about count — lazy composition already makes count cheap. The real concerns are: keep composables <strong>skippable</strong> (Section 09), <strong>page</strong> the data if it's unbounded, and cancel async work on <strong>disposal</strong>.</p>
+
+    <h4>Cancel async work on disposal — DisposableEffect</h4>
+    <p>Because items are disposed when they scroll off, you cancel pending per-item work in <code>onDispose</code> — preventing stale work landing on a recomposed item ("wrong content in wrong row").</p>
+    <pre><code>@Composable
+fun PostRow(post: Post) {
+    DisposableEffect(post.id) {
+        val job = startAsyncWork(post.id)
+        onDispose { job.cancel() }   <span class="tok-arrow">// runs when the item is disposed</span>
+    }
+    ...
+}</code></pre>
+
+    <h4>Unbounded data — Paging 3</h4>
+    <p>When data is too large to hold at once (a server feed, a huge database table), Paging 3 loads it in <strong>pages</strong> on demand and keeps only a window in memory. It has three layers — a <strong>producer</strong> (where pages come from), a <strong>Pager/PagingData</strong> (the stream), and the <strong>UI</strong> (your LazyColumn) — and the library wires the "load the next page as the user nears the end" logic between them so you never write a scroll listener.</p>
+
+    <figure>
+      <svg viewBox="0 0 880 280" xmlns="http://www.w3.org/2000/svg" font-family="JetBrains Mono, monospace">
+        <text x="30" y="24" font-size="12" fill="#828a93">Paging 3 data flow — producer → stream → UI, with paging logic in between</text>
+
+        <!-- producer -->
+        <rect x="40" y="48" width="220" height="92" rx="6" fill="#f4f0f8" stroke="#7a3e9d"/>
+        <text x="150" y="72" font-size="12.5" font-weight="600" fill="#7a3e9d" text-anchor="middle">PagingSource&lt;Key, Value&gt;</text>
+        <text x="150" y="94" font-size="10.5" fill="#444a52" text-anchor="middle">load(params): LoadResult</text>
+        <text x="150" y="110" font-size="10.5" fill="#444a52" text-anchor="middle">"give me page after key K"</text>
+        <text x="150" y="128" font-size="10" fill="#828a93" text-anchor="middle">network API or Room query</text>
+
+        <!-- pager -->
+        <rect x="330" y="48" width="220" height="92" rx="6" fill="#eef5f8" stroke="#2c6e8f"/>
+        <text x="440" y="72" font-size="12.5" font-weight="600" fill="#2c6e8f" text-anchor="middle">Pager → Flow&lt;PagingData&gt;</text>
+        <text x="440" y="94" font-size="10.5" fill="#444a52" text-anchor="middle">PagingConfig(pageSize, …)</text>
+        <text x="440" y="110" font-size="10.5" fill="#444a52" text-anchor="middle">exposed from the ViewModel</text>
+        <text x="440" y="128" font-size="10" fill="#828a93" text-anchor="middle">.cachedIn(viewModelScope)</text>
+
+        <!-- ui -->
+        <rect x="620" y="48" width="220" height="92" rx="6" fill="#eef9f0" stroke="#2e7d4f"/>
+        <text x="730" y="72" font-size="12.5" font-weight="600" fill="#2e7d4f" text-anchor="middle">LazyColumn (UI)</text>
+        <text x="730" y="94" font-size="10.5" fill="#444a52" text-anchor="middle">collectAsLazyPagingItems()</text>
+        <text x="730" y="110" font-size="10.5" fill="#444a52" text-anchor="middle">items(count, key=itemKey)</text>
+        <text x="730" y="128" font-size="10" fill="#828a93" text-anchor="middle">renders the loaded window</text>
+
+        <g stroke="#828a93" stroke-width="1.5" fill="none">
+          <path d="M260 94 L328 94" marker-end="url(#ap)"/>
+          <path d="M550 94 L618 94" marker-end="url(#ap)"/>
+        </g>
+        <defs><marker id="ap" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#828a93"/></marker></defs>
+
+        <!-- feedback arrow: scroll triggers next load -->
+        <path d="M730 140 C730 200, 150 200, 150 142" stroke="#b5341f" stroke-width="1.5" fill="none" stroke-dasharray="5 4" marker-end="url(#ar2p)"/>
+        <text x="440" y="196" font-size="11" fill="#b5341f" text-anchor="middle">scrolling near the end → library asks PagingSource for the next page</text>
+        <defs><marker id="ar2p" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#b5341f"/></marker></defs>
+
+        <text x="30" y="240" font-size="11.5" fill="#444a52">You write the PagingSource (or get one free from Room). The library owns the loop:</text>
+        <text x="30" y="258" font-size="11.5" fill="#444a52">when to fetch, dedup, retry, and what "near the end" means (the prefetch distance).</text>
+      </svg>
+      <figcaption>Fig 11 · The three Paging layers and the load loop the library runs for you</figcaption>
+    </figure>
+
+    <h4>The producer — PagingSource</h4>
+    <p>A <code>PagingSource</code> answers one question: "given a key (e.g. a page number), return that page plus the keys for the pages on either side." The library calls it whenever it needs more data.</p>
+    <pre><code>class MessageSource(val api: Api) : PagingSource&lt;Int, Message&gt;() {
+
+    <span class="tok-key">override suspend fun</span> load(params: LoadParams&lt;Int&gt;): LoadResult&lt;Int, Message&gt; {
+        <span class="tok-key">val</span> page = params.key ?: 1                <span class="tok-cmt">// first load → page 1</span>
+        <span class="tok-key">return try</span> {
+            <span class="tok-key">val</span> messages = api.getMessages(page, params.loadSize)
+            LoadResult.Page(
+                data = messages,
+                prevKey = <span class="tok-key">if</span> (page == 1) null <span class="tok-key">else</span> page - 1,  <span class="tok-cmt">// null = no more above</span>
+                nextKey = <span class="tok-key">if</span> (messages.isEmpty()) null <span class="tok-key">else</span> page + 1 <span class="tok-cmt">// null = end of list</span>
+            )
+        } <span class="tok-key">catch</span> (e: IOException) {
+            LoadResult.Error(e)                    <span class="tok-cmt">// surfaces as LoadState.Error in the UI</span>
+        }
+    }
+
+    <span class="tok-key">override fun</span> getRefreshKey(state: PagingState&lt;Int, Message&gt;) =
+        state.anchorPosition?.let { state.closestPageToPosition(it)?.prevKey?.plus(1) }
+}</code></pre>
+    <p>The ViewModel wraps it in a <code>Pager</code> and exposes the flow:</p>
+    <pre><code>class FeedViewModel(api: Api) : ViewModel() {
+    <span class="tok-key">val</span> messages: Flow&lt;PagingData&lt;Message&gt;&gt; = Pager(
+        config = PagingConfig(pageSize = 20, prefetchDistance = 5)
+    ) { MessageSource(api) }
+        .flow
+        .cachedIn(viewModelScope)   <span class="tok-cmt">// survives config changes; don't re-fetch on rotation</span>
+}</code></pre>
+    <div class="box key">
+      <span class="lab">Two settings that shape behaviour</span>
+      <p><code>pageSize</code> is how many items a page fetches. <code>prefetchDistance</code> is how far from the loaded edge the user must scroll before the next page request fires — bigger means earlier fetching (smoother, more eager network use). <code>cachedIn(scope)</code> is important: without it, rotating the screen re-runs the whole pipeline from page 1.</p>
+    </div>
+
+    <h4>The UI — collect, render, placeholder</h4>
+    <pre><code>@Composable
+fun MessageList(vm: FeedViewModel) {
+    <span class="tok-key">val</span> items = vm.messages.collectAsLazyPagingItems()   <span class="tok-cmt">// the bridge</span>
+
+    LazyColumn {
+        items(
+            count = items.itemCount,
+            key   = items.itemKey { it.id }       <span class="tok-cmt">// paging-aware key (Section 05)</span>
+        ) { index -&gt;
+            <span class="tok-key">val</span> message = items[index]            <span class="tok-cmt">// may be null while its page loads</span>
+            <span class="tok-key">if</span> (message != null) MessageRow(message)
+            <span class="tok-key">else</span> MessagePlaceholder()            <span class="tok-cmt">// per-item shimmer/spinner</span>
+        }
+    }
+}</code></pre>
+    <ul>
+      <li><strong>Null-and-placeholder</strong>: an as-yet-unloaded slot returns <code>null</code> → render a placeholder. (Placeholders require the source to know the total count; otherwise items simply append without nulls.)</li>
+      <li><strong><code>itemKey { }</code> / <code>itemContentType { }</code></strong>: paging-aware versions of <code>key</code> and <code>contentType</code>, since paged data is index-accessed rather than a Kotlin list.</li>
+    </ul>
+    <div class="box warn">
+      <span class="lab">API note</span>
+      <p>The older <code>items(lazyPagingItems) { … }</code> and <code>itemsIndexed(lazyPagingItems)</code> forms are deprecated in favour of the <code>count</code> + <code>itemKey</code> form shown above. Many blog snippets still use the deprecated form.</p>
+    </div>
+
+    <h4>LoadState — the whole-list status</h4>
+    <p>Separate from per-item nulls, <code>items.loadState</code> reports the status of the list as a whole, in three buckets: <code>refresh</code> (the initial load or a pull-to-refresh), <code>append</code> (loading the next page at the bottom), and <code>prepend</code> (loading earlier pages at the top). Each is a <code>LoadState</code>: <code>Loading</code>, <code>NotLoading</code>, or <code>Error</code>.</p>
+    <pre><code><span class="tok-key">when</span> (<span class="tok-key">val</span> refresh = items.loadState.refresh) {
+    <span class="tok-key">is</span> LoadState.Loading -&gt; FullScreenSpinner()              <span class="tok-cmt">// first page loading</span>
+    <span class="tok-key">is</span> LoadState.Error   -&gt; FullScreenError(onRetry = { items.retry() })
+    <span class="tok-key">else</span> -&gt; { <span class="tok-cmt">/* content shows via the LazyColumn above */</span> }
+}
+
+<span class="tok-cmt">// append (bottom) state → footer row inside the LazyColumn:</span>
+<span class="tok-key">when</span> (items.loadState.append) {
+    <span class="tok-key">is</span> LoadState.Loading -&gt; item { LoadingFooter() }         <span class="tok-cmt">// spinner at the bottom</span>
+    <span class="tok-key">is</span> LoadState.Error   -&gt; item { RetryFooter { items.retry() } }
+    <span class="tok-key">else</span> -&gt; {}
+}</code></pre>
+    <figure>
+      <svg viewBox="0 0 880 200" xmlns="http://www.w3.org/2000/svg" font-family="JetBrains Mono, monospace">
+        <text x="30" y="24" font-size="12" fill="#828a93">The three LoadState channels map to three places in the UI</text>
+        <!-- phone -->
+        <rect x="340" y="40" width="200" height="150" rx="12" fill="#f6f8fa" stroke="#c8d0da" stroke-width="2"/>
+        <rect x="356" y="52" width="168" height="20" rx="3" fill="#e0d4ee" stroke="#7a3e9d"/><text x="440" y="66" font-size="9.5" fill="#7a3e9d" text-anchor="middle">prepend → top spinner</text>
+        <g fill="#cfe6f0" stroke="#2c6e8f">
+          <rect x="356" y="78" width="168" height="26" rx="3"/><rect x="356" y="108" width="168" height="26" rx="3"/><rect x="356" y="138" width="168" height="26" rx="3"/>
+        </g>
+        <text x="440" y="95" font-size="9.5" fill="#2c6e8f" text-anchor="middle">loaded items</text>
+        <rect x="356" y="168" width="168" height="16" rx="3" fill="#d6efe0" stroke="#2e7d4f"/><text x="440" y="180" font-size="9" fill="#2e7d4f" text-anchor="middle">append → bottom spinner</text>
+
+        <text x="600" y="70" font-size="11" fill="#444a52">refresh → full-screen</text>
+        <text x="600" y="88" font-size="11" fill="#444a52">spinner / error+retry</text>
+        <text x="600" y="118" font-size="11" fill="#444a52">append → bottom footer</text>
+        <text x="600" y="148" font-size="11" fill="#444a52">prepend → top footer</text>
+
+        <text x="40" y="80" font-size="11" fill="#444a52">refresh = first load</text>
+        <text x="40" y="98" font-size="11" fill="#444a52">or pull-to-refresh</text>
+        <text x="40" y="128" font-size="11" fill="#828a93">retry() re-runs the</text>
+        <text x="40" y="146" font-size="11" fill="#828a93">failed load only</text>
+      </svg>
+      <figcaption>Fig 12 · refresh, append, and prepend each drive a different UI affordance</figcaption>
+    </figure>
+
+    <h4>Network + local cache — RemoteMediator</h4>
+    <p>A <code>PagingSource</code> alone is fine for "network only" or "database only." But the robust pattern for a real app is <strong>database as the single source of truth, network filling it</strong>: the UI always reads from Room, and a <code>RemoteMediator</code> fetches from the network and writes into Room when the list runs low. The UI then works offline (it reads whatever Room has) and stays fresh (the mediator tops it up).</p>
+    <pre><code>Pager(
+    config = PagingConfig(pageSize = 20),
+    remoteMediator = MessageRemoteMediator(api, db)  <span class="tok-cmt">// network → writes into Room</span>
+) {
+    db.messageDao().pagingSource()                   <span class="tok-cmt">// UI reads ONLY from Room</span>
+}.flow.cachedIn(viewModelScope)</code></pre>
+    <div class="box key">
+      <span class="lab">When to use which</span>
+      <p><strong>PagingSource only</strong> → ephemeral feeds where offline doesn't matter (search results, a remote-only list). <strong>RemoteMediator + Room</strong> → content that should persist and read offline (messages, articles, anything the user revisits). The Compose UI code is identical either way; only the producer differs.</p>
+    </div>
+
+    <h4>Bounded big lists — no Paging needed</h4>
+    <p>If the whole list genuinely fits in memory (a few thousand items), skip Paging entirely — a plain <code>LazyColumn</code> over the list is simpler and faster. There, "big" reduces to two disciplines already covered: keep items <strong>skippable</strong> (Section 09) and cancel per-item async work on <strong>disposal</strong> (above). Paging earns its complexity only when the data is too large to hold or comes in pages from a server.</p>
+
+    <h4>Prefetch</h4>
+    <p>Lazy lists compose a little <em>ahead</em> of the viewport during idle time so items don't stall when they appear. Recent Compose adds <code>LazyLayoutCacheWindow</code> to tune how many items to prefetch (default: one at a time).</p>
+  </section>
+
+  <!-- 13. FULL EXAMPLE -->
+  <section id="full">
+    <span class="sec-num">Section 13</span>
+    <h2 class="sec">The full worked example</h2>
+    <p>One screen exercising every concept: lazy composition, <code>key</code>, <code>animateItem</code>, state hoisting, reassign-not-mutate, and a re-measure on expand.</p>
+    <pre><code><span class="tok-cmt">// ── DATA ── all val → stable → skippable</span>
+<span class="tok-key">data class</span> Post(<span class="tok-key">val</span> id: Long, <span class="tok-key">val</span> author: String, <span class="tok-key">val</span> body: String, <span class="tok-key">val</span> likes: Int)
+
+<span class="tok-cmt">// ── STATE HOLDER ── list hoisted OUT of the list (durable)</span>
+class FeedViewModel : ViewModel() {
+    <span class="tok-key">var</span> posts <span class="tok-key">by</span> mutableStateOf(initialPosts)
+        <span class="tok-key">private set</span>
+
+    fun like(id: Long) {                          <span class="tok-cmt">// reassign a NEW list, never mutate</span>
+        posts = posts.map { <span class="tok-key">if</span> (it.id == id) it.copy(likes = it.likes + 1) <span class="tok-key">else</span> it }
+    }
+    fun delete(id: Long) { posts = posts.filterNot { it.id == id } }
+    fun addAtTop() {
+        <span class="tok-key">val</span> newId = (posts.maxOfOrNull { it.id } ?: 0) + 1
+        posts = listOf(Post(newId, <span class="tok-str">"You"</span>, <span class="tok-str">"Brand new post"</span>, 0)) + posts
+    }
+}
+
+<span class="tok-cmt">// ── THE LIST ──</span>
+@Composable
+fun FeedScreen(vm: FeedViewModel = viewModel()) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        items(items = vm.posts, key = { it.id }) { post ->     <span class="tok-cmt">// identity</span>
+            PostRow(
+                post = post,
+                onLike = { vm.like(post.id) },
+                onDelete = { vm.delete(post.id) },
+                modifier = Modifier.animateItem()              <span class="tok-cmt">// add/remove/move anim</span>
+            )
+        }
+    }
+}
+
+<span class="tok-cmt">// ── ONE ITEM ── the on-demand recipe</span>
+@Composable
+fun PostRow(post: Post, onLike: () -&gt; Unit, onDelete: () -&gt; Unit, modifier: Modifier = Modifier) {
+    <span class="tok-key">var</span> expanded <span class="tok-key">by</span> remember { mutableStateOf(false) }   <span class="tok-cmt">// ephemeral — dies on disposal</span>
+
+    Card(modifier = modifier.fillMaxWidth()) {
+        Column(Modifier.padding(12.dp)) {
+            Text(post.author, style = MaterialTheme.typography.titleMedium)
+            Text(post.body, maxLines = <span class="tok-key">if</span> (expanded) Int.MAX_VALUE <span class="tok-key">else</span> 1)  <span class="tok-cmt">// toggling re-measures THIS item</span>
+            Row {
+                TextButton(onClick = onLike)   { Text(<span class="tok-str">"♥ ${post.likes}"</span>) }
+                TextButton(onClick = onDelete) { Text(<span class="tok-str">"Delete"</span>) }
+                TextButton(onClick = { expanded = !expanded }) {
+                    Text(<span class="tok-key">if</span> (expanded) <span class="tok-str">"Less"</span> <span class="tok-key">else</span> <span class="tok-str">"More"</span>)
+                }
+            }
+        }
+    }
+}</code></pre>
+    <p>Running it: scrolling composes/disposes rows lazily; liking reassigns the list and recomposes exactly one row; deleting fades a row out; adding fades the new one in and slides the rest down; expanding re-measures a single item (single-pass) and <code>animateItem</code> smooths the height change. Every behaviour traces to a section above.</p>
+  </section>
