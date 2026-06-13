@@ -1,0 +1,196 @@
+<style>
+  /* Model Routing Playbook – component styles scoped via .rich-body */
+  .rich-body {
+    --mrp-haiku: #0E9F6E;
+    --mrp-sonnet: #B45309;
+    --mrp-opus: #6D4FD0;
+  }
+  .chip {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    padding: 3px 10px;
+    border-radius: 999px;
+    white-space: nowrap;
+    display: inline-block;
+    vertical-align: middle;
+  }
+  .chip.h { color: var(--mrp-haiku); border: 1.5px solid var(--mrp-haiku); }
+  .chip.s { color: var(--mrp-sonnet); border: 1.5px solid var(--mrp-sonnet); }
+  .chip.o { color: var(--mrp-opus); border: 1.5px solid var(--mrp-opus); }
+
+  .tiers { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; margin: 22px 0; }
+  .tier { background: var(--panel, #F6F7F9); border: 1px solid var(--line, #E4E7EC); border-radius: 10px; padding: 18px; }
+  .tier .t-name { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; margin-bottom: 6px; }
+  .tier.h .t-name { color: var(--mrp-haiku); }
+  .tier.s .t-name { color: var(--mrp-sonnet); }
+  .tier.o .t-name { color: var(--mrp-opus); }
+  .tier .t-q { font-size: .86rem; line-height: 1.55; }
+  @media(max-width:660px){ .tiers { grid-template-columns: 1fr; } }
+
+  .callout {
+    background: var(--panel, #F6F7F9);
+    border: 1px solid var(--line, #E4E7EC);
+    border-left: 4px solid var(--mrp-opus);
+    border-radius: 10px;
+    padding: 20px 22px;
+    margin: 22px 0;
+  }
+  .callout p { margin: 0; }
+
+  .router { margin: 0 0 4px; }
+  .router svg { width: 100%; height: auto; display: block; }
+  .node-box { fill: var(--panel, #F6F7F9); stroke: var(--line, #E4E7EC); stroke-width: 1.5; }
+  .node-label { font-family: 'JetBrains Mono', monospace; font-size: 13px; }
+  .node-sub { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; opacity: .7; }
+  .rl { fill: none; stroke-width: 2; }
+  .flow { stroke-dasharray: 6 10; animation: mrp-flow 1.4s linear infinite; }
+  @keyframes mrp-flow { to { stroke-dashoffset: -32; } }
+  @media(prefers-reduced-motion:reduce){ .flow { animation: none; } }
+  .router-caption { font-family: 'JetBrains Mono', monospace; font-size: 12px; text-align: center; margin: 8px 0 32px; opacity: .65; }
+
+  .rich-body pre .c { color: #9BA5B0; }
+  .rich-body pre .h { color: var(--mrp-haiku); font-weight: 700; }
+  .rich-body pre .s { color: var(--mrp-sonnet); font-weight: 700; }
+  .rich-body pre .o { color: var(--mrp-opus); font-weight: 700; }
+
+  ul.rules { list-style: none; margin: 16px 0; padding: 0; }
+  ul.rules li {
+    padding: 13px 0 13px 26px;
+    border-bottom: 1px dashed var(--line, #E4E7EC);
+    position: relative;
+  }
+  ul.rules li::before { content: "▸"; position: absolute; left: 4px; opacity: .5; }
+</style>
+
+<!-- Routing diagram -->
+<div class="router" aria-label="Diagram: a task enters the setup and is routed to haiku, sonnet, or opus automatically">
+  <svg viewBox="0 0 760 270" role="img" xmlns="http://www.w3.org/2000/svg">
+    <rect class="node-box" x="10" y="110" width="130" height="50" rx="8"/>
+    <text class="node-label" x="75" y="131" text-anchor="middle">task spec</text>
+    <text class="node-sub" x="75" y="148" text-anchor="middle">just the spec</text>
+
+    <rect class="node-box" x="290" y="100" width="180" height="70" rx="8"/>
+    <text class="node-label" x="380" y="128" text-anchor="middle">the setup</text>
+    <text class="node-sub" x="380" y="146" text-anchor="middle">tier tag + agent rules</text>
+
+    <path class="rl flow" stroke="#0E9F6E" d="M140 135 H290"/>
+    <path class="rl flow" stroke="#0E9F6E" d="M470 120 C530 120 540 45 600 45"/>
+    <path class="rl flow" stroke="#B45309" d="M470 135 H600"/>
+    <path class="rl flow" stroke="#6D4FD0" d="M470 150 C530 150 540 225 600 225"/>
+
+    <rect class="node-box" x="600" y="20" width="150" height="50" rx="8"/>
+    <text class="node-label" x="675" y="41" text-anchor="middle" style="fill:#0E9F6E">haiku</text>
+    <text class="node-sub" x="675" y="58" text-anchor="middle">fails fast &amp; loud</text>
+
+    <rect class="node-box" x="600" y="110" width="150" height="50" rx="8"/>
+    <text class="node-label" x="675" y="131" text-anchor="middle" style="fill:#B45309">sonnet</text>
+    <text class="node-sub" x="675" y="148" text-anchor="middle">tests catch it</text>
+
+    <rect class="node-box" x="600" y="200" width="150" height="50" rx="8"/>
+    <text class="node-label" x="675" y="221" text-anchor="middle" style="fill:#6D4FD0">opus</text>
+    <text class="node-sub" x="675" y="238" text-anchor="middle">bugs hide quietly</text>
+  </svg>
+  <p class="router-caption">// no human in this diagram is choosing a model</p>
+</div>
+
+<section id="point">
+  <span class="sec-num">§0 — The point</span>
+  <h2 class="sec">How this works</h2>
+  <p>Most "use the right model" advice depends on every developer making a good call in the moment. Under deadline pressure, that call is almost always the biggest model.</p>
+  <p>So the idea here is to move that decision out of the moment entirely. The model tier gets written into the task at planning time. The rules get committed into the repo. By the time you delegate, there is nothing left to decide — just hand over the spec.</p>
+  <div class="callout">
+    <p>The agents follow whatever rules the setup defines. When routing turns out wrong, update the setup — not the prompt.</p>
+  </div>
+</section>
+
+<section id="repo">
+  <span class="sec-num">§1 — What lives in the repo</span>
+  <h2 class="sec">The whole setup travels with <code>git clone</code></h2>
+  <p>Everything is committed. Every teammate who clones the repo gets the same tiers, the same pinned models, and the same standing rules — no manual sync needed.</p>
+<pre>repo-root/
+├── CLAUDE.md                  <span class="c"># module map, build commands, conventions</span>
+│                              <span class="c"># written once, never repeated in prompts</span>
+├── .claude/
+│   └── agents/
+│       ├── <span class="h">impl-boilerplate.md</span>   <span class="c"># model: haiku  — mechanical, fully-specified tasks</span>
+│       ├── <span class="s">impl-standard.md</span>      <span class="c"># model: sonnet — default production tier</span>
+│       └── <span class="o">impl-critical.md</span>      <span class="c"># model: opus   — correctness-critical work</span>
+└── docs/
+    └── design.md              <span class="c"># every task carries a model tag (see §3)</span></pre>
+  <p><strong>Standing rules live in the agent file, not in prompts.</strong> Each agent has its model pinned in frontmatter — plus rules like: verify the build before finishing, never touch git, never log sensitive data. If you find yourself repeating an instruction in prompts, that's a sign it belongs in the agent file.</p>
+</section>
+
+<section id="rubric">
+  <span class="sec-num">§2 — How to pick the tier</span>
+  <h2 class="sec">One question decides the tier</h2>
+  <p><em>This guide is a starting point — it will likely change as the team runs it on real tasks.</em></p>
+  <div class="tiers">
+    <div class="tier h"><div class="t-name">→ haiku</div><div class="t-q">If this is wrong, the build breaks immediately and loudly.</div></div>
+    <div class="tier s"><div class="t-name">→ sonnet</div><div class="t-q">If this is wrong, tests or code review catch it within the sprint.</div></div>
+    <div class="tier o"><div class="t-name">→ opus</div><div class="t-q">If this is wrong, the bug hides silently and hurts users or security later.</div></div>
+  </div>
+  <table>
+    <thead><tr><th>Failure mode</th><th>Tier</th><th>Examples</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Build breaks instantly</td>
+        <td><span class="chip h">haiku</span></td>
+        <td>scaffolding, config, string resources, simple data classes, test fixtures</td>
+      </tr>
+      <tr>
+        <td>Caught within the sprint</td>
+        <td><span class="chip s">sonnet</span></td>
+        <td>DB/DAO layers, background jobs, UI screens, repositories, well-specified tests</td>
+      </tr>
+      <tr>
+        <td>Hides quietly, hurts later</td>
+        <td><span class="chip o">opus</span></td>
+        <td>parsers, validators, filters, crypto &amp; key handling, anything consuming LLM output</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>Tie-breakers: ambiguous spec or needs design judgment → bump one tier up. Fully specified down to exact file paths and signatures → can go one tier down. When two people disagree on the tier, the higher one wins — and the guide gets a new row.</p>
+</section>
+
+<section id="planning">
+  <span class="sec-num">§3 — When the decision happens</span>
+  <h2 class="sec">Tier is set at planning time, not prompt time</h2>
+  <p>Every task in the design doc or sprint board gets a model tag — <span class="chip h">haiku</span> <span class="chip s">sonnet</span> <span class="chip o">opus</span> — when the task is written. The tag gets reviewed in planning just like estimates do: anyone can ask "why is this opus?"</p>
+  <p>By delegation time there is nothing left to decide. Task says <code>sonnet</code> → invoke <code>impl-standard</code> → done. This is likely the most important piece: the agents save tokens per task, but the planning-time tag is what keeps the saving consistent across the team.</p>
+</section>
+
+<section id="spec">
+  <span class="sec-num">§4 — The delegation prompt</span>
+  <h2 class="sec">The prompt is only the spec</h2>
+  <p>Project context is in <code>CLAUDE.md</code>. Rules and the model are in the agent file. What's left is just the task itself:</p>
+<pre>Task:         <span class="c">&lt;one line&gt;</span>
+Tier:         <span class="c">&lt;haiku | sonnet | opus&gt;   # from the design-doc tag</span>
+Spec:         <span class="c">&lt;design-doc section refs, or exact paths/signatures for haiku tasks&gt;</span>
+Done when:    <span class="c">&lt;observable result — "test task green", "screen renders state Y"&gt;</span>
+Out of scope: <span class="c">&lt;what NOT to touch&gt;</span></pre>
+  <p>Haiku-tier specs need to be concrete enough that the agent makes zero design decisions. If you can't write it that precisely, it's not haiku-tier — bump it up.</p>
+</section>
+
+<section id="escalation">
+  <span class="sec-num">§5 — When the setup pushes back</span>
+  <h2 class="sec">Escalation is built in</h2>
+  <p>The agents handle half of this on their own — the boilerplate agent stops on ambiguity instead of guessing; the standard agent stops on any contract or schema change. The team rules cover the rest:</p>
+  <ul class="rules">
+    <li><strong>Two ambiguity stops on the same haiku task = re-tag.</strong> Don't keep clarifying and retrying — rewrite the spec or move it to sonnet.</li>
+    <li><strong>Contract or interface change?</strong> The standard agent halts by design. That decision goes back to the design doc first.</li>
+    <li><strong>Never escalate silently.</strong> If a task ran on a higher tier than tagged, update the tag. That's how this guide gets better over time.</li>
+  </ul>
+</section>
+
+<section id="onboarding">
+  <span class="sec-num">§6 — New teammate</span>
+  <h2 class="sec">Onboarding takes five minutes</h2>
+  <ul class="rules">
+    <li>Clone the repo — the agents and <code>CLAUDE.md</code> come with it.</li>
+    <li>Read the routing guide in §2.</li>
+    <li>First week: only delegate tasks that already have a tier tag.</li>
+    <li>Week two onward: tag your own tasks and get them reviewed in planning.</li>
+  </ul>
+</section>

@@ -63,6 +63,12 @@ export const TAXONOMY = [
       { name: "Growth", subs: [] },
     ],
   },
+  {
+    name: "AI",
+    topics: [
+      { name: "Claude Code", subs: ["Workflow", "Configuration"] },
+    ],
+  },
 ] as const;
 
 // Turn a display name into a URL slug, e.g. "Jetpack Compose" -> "jetpack-compose".
