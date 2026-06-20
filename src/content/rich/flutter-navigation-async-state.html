@@ -1,0 +1,515 @@
+<style>
+  /* Flutter reference — a few helpers the house theme doesn't ship; scoped to .rich-body */
+  .rich-body .lead { font-size: 1.06rem; color: var(--ink-soft); margin-bottom: 18px; }
+  .rich-body em.term { font-style: normal; font-weight: 600; color: var(--accent); }
+  .rich-body .mantra { font-weight: 600; color: var(--ink); background: linear-gradient(transparent 60%, var(--accent-soft) 60%); padding: 0 2px; }
+  .rich-body .pill { display: inline-block; font-family: "JetBrains Mono", monospace; font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 999px; letter-spacing: .04em; vertical-align: middle; }
+  .rich-body .pill.blue { background: #eef4f8; color: var(--accent2); }
+  .rich-body .pill.green { background: #eef6f0; color: var(--accent3); }
+  .rich-body .pill.orange { background: #fdf6e8; color: var(--accent-amber); }
+  .rich-body .twocol { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 22px 0; }
+  .rich-body .twocol .card { border: 1px solid var(--rule); border-radius: 6px; padding: 16px 18px; font-size: 15px; }
+  .rich-body .twocol .card h4 { margin: 0 0 8px; }
+  .rich-body .twocol .card.bad { background: #fdf6e8; border-color: #ecd9a8; }
+  .rich-body .twocol .card.good { background: #eef6f0; border-color: #c4dfcd; }
+  .rich-body .twocol .card.bad h4 { color: var(--accent-amber); }
+  .rich-body .twocol .card.good h4 { color: var(--accent3); }
+  @media (max-width: 660px) { .rich-body .twocol { grid-template-columns: 1fr; } }
+</style>
+
+<section id="tree">
+  <span class="sec-num">Section 01</span>
+  <h2 class="sec">Widget · Element · State — the three objects</h2>
+  <p class="lead">Everything else rests on this. A single <code>StatefulWidget</code> on screen is really <strong>three</strong> distinct objects at runtime, not one.</p>
+
+  <figure>
+    <svg viewBox="0 0 620 250" xmlns="http://www.w3.org/2000/svg" font-family="JetBrains Mono, monospace">
+      <defs><marker id="a1" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#6b6b80"/></marker></defs>
+      <rect x="40" y="30" width="170" height="64" rx="10" fill="#e8f1fb" stroke="#1565c0" stroke-width="2"/>
+      <text x="125" y="55" text-anchor="middle" font-size="14" font-weight="700" fill="#1565c0">Widget</text>
+      <text x="125" y="76" text-anchor="middle" font-size="11.5" fill="#3a3a52">description · disposable</text>
+
+      <rect x="225" y="90" width="170" height="70" rx="10" fill="#fff3e8" stroke="#e65100" stroke-width="2.5"/>
+      <text x="310" y="116" text-anchor="middle" font-size="14" font-weight="700" fill="#e65100">Element</text>
+      <text x="310" y="135" text-anchor="middle" font-size="11.5" fill="#3a3a52">mounted node in tree</text>
+      <text x="310" y="151" text-anchor="middle" font-size="11.5" font-weight="700" fill="#e65100">= the BuildContext</text>
+
+      <rect x="410" y="170" width="170" height="64" rx="10" fill="#eaf5eb" stroke="#2e7d32" stroke-width="2"/>
+      <text x="495" y="195" text-anchor="middle" font-size="14" font-weight="700" fill="#2e7d32">State</text>
+      <text x="495" y="216" text-anchor="middle" font-size="11.5" fill="#3a3a52">your data lives here</text>
+
+      <line x1="225" y1="115" x2="212" y2="80" stroke="#6b6b80" stroke-width="1.5" marker-end="url(#a1)"/>
+      <text x="150" y="110" font-size="10.5" fill="#6b6b80">holds current →</text>
+      <line x1="395" y1="135" x2="408" y2="178" stroke="#6b6b80" stroke-width="1.5" marker-end="url(#a1)"/>
+      <text x="400" y="125" font-size="10.5" fill="#6b6b80">owns ↓</text>
+    </svg>
+    <figcaption>Fig 1 · The Element sits in the middle — it points up to the current Widget and owns the State below</figcaption>
+  </figure>
+
+  <table>
+    <thead><tr><th>Object</th><th>What it is</th><th>Lifetime</th></tr></thead>
+    <tbody>
+    <tr><td><span class="pill blue">Widget</span></td><td>A lightweight description / config object (e.g. <code>CounterScreen()</code>)</td><td>Thrown away &amp; rebuilt constantly</td></tr>
+    <tr><td><span class="pill orange">Element</span></td><td>The mounted node — Flutter creates it, you never write it. <strong>This is the <code>context</code>.</strong></td><td>Stays mounted while on screen</td></tr>
+    <tr><td><span class="pill green">State</span></td><td>The long-lived object holding mutable data (<code>count</code>, a stored <code>Future</code>)</td><td>Survives rebuilds; disposed when removed from tree</td></tr>
+    </tbody>
+  </table>
+
+  <div class="box key"><span class="lab">The rule that explains 90% of "why did my state reset?"</span>
+  <p>Out of the tree → element unmounted → <strong>State disposed → data gone</strong>. Back in the tree → brand-new element + brand-new State, fresh from scratch.</p></div>
+
+  <h3>setState, mechanically</h3>
+  <p><code>setState()</code> mutates a field on the <strong>State</strong>, flags the <strong>Element</strong> dirty, and the element re-runs <code>build()</code>. The State survived; the Widget was rebuilt; the Element orchestrated it. A <code>StatelessWidget</code> simply has no State object — just Widget + Element.</p>
+</section>
+
+<section id="context">
+  <span class="sec-num">Section 02</span>
+  <h2 class="sec">BuildContext — your address, and the upward walk</h2>
+  <p class="lead"><span class="mantra">context = "where am I in the tree?"</span> and <code>.of(context)</code> is a lookup that searches <strong>upward</strong> from that address.</p>
+
+  <p>Many things live <em>above</em> a widget: the <code>Navigator</code>, <code>Theme</code>, <code>MediaQuery</code>. When you call <code>Navigator.of(context)</code>, Flutter starts at your position and walks parent-by-parent until it finds the nearest one.</p>
+
+  <table>
+    <thead><tr><th>Call</th><th>Means</th></tr></thead>
+    <tbody>
+    <tr><td><code>Navigator.of(context)</code></td><td>Walk up, find the Navigator, push/pop on it</td></tr>
+    <tr><td><code>MediaQuery.of(context)</code></td><td>Walk up, find MediaQuery, read <code>viewInsets</code> etc.</td></tr>
+    <tr><td><code>Theme.of(context)</code></td><td>Walk up, find Theme, read colors/fonts</td></tr>
+    </tbody>
+  </table>
+
+  <div class="box warn"><span class="lab">Classic bug</span>
+  <p>Using a context that sits <strong>above</strong> the thing you're looking for — the upward walk never finds it. Also: a widget gets a context <strong>only once mounted</strong>; an unmounted (or already-popped) context is invalid. The <code>context</code> handed to <code>build()</code> is always safe.</p></div>
+</section>
+
+<section id="keyboard">
+  <span class="sec-num">Section 03</span>
+  <h2 class="sec">How the keyboard moves your UI</h2>
+  <p class="lead">Flutter exposes the keyboard through <code>MediaQuery</code>. Three values, two consumers.</p>
+
+  <figure>
+    <svg viewBox="0 0 620 300" xmlns="http://www.w3.org/2000/svg" font-family="JetBrains Mono, monospace">
+      <g transform="translate(30,30)">
+        <rect x="0" y="0" width="150" height="240" rx="18" fill="#fff" stroke="#222" stroke-width="2"/>
+        <rect x="55" y="0" width="40" height="11" rx="5" fill="#222"/>
+        <rect x="5" y="6" width="140" height="22" rx="5" fill="#ffe0b2"/>
+        <text x="75" y="21" text-anchor="middle" font-size="9" fill="#5a4a2a">status bar (viewPadding)</text>
+        <rect x="5" y="31" width="140" height="178" rx="4" fill="#eaf5eb"/>
+        <text x="75" y="120" text-anchor="middle" font-size="11" font-weight="700" fill="#2e7d32">body (full)</text>
+        <rect x="5" y="211" width="140" height="22" rx="4" fill="#fff3e8" stroke="#fb8c00"/>
+        <text x="75" y="226" text-anchor="middle" font-size="9.5" fill="#e65100">input bar</text>
+        <text x="75" y="255" text-anchor="middle" font-size="10" font-weight="700" fill="#1a1a2e">viewInsets.bottom = 0</text>
+      </g>
+      <g transform="translate(280,30)">
+        <rect x="0" y="0" width="150" height="240" rx="18" fill="#fff" stroke="#222" stroke-width="2"/>
+        <rect x="55" y="0" width="40" height="11" rx="5" fill="#222"/>
+        <rect x="5" y="6" width="140" height="22" rx="5" fill="#ffe0b2"/>
+        <rect x="5" y="31" width="140" height="96" rx="4" fill="#eaf5eb"/>
+        <text x="75" y="82" text-anchor="middle" font-size="11" font-weight="700" fill="#2e7d32">body (shrunk)</text>
+        <rect x="5" y="129" width="140" height="22" rx="4" fill="#fff3e8" stroke="#fb8c00"/>
+        <text x="75" y="144" text-anchor="middle" font-size="9.5" fill="#e65100">input (rode up)</text>
+        <rect x="5" y="153" width="140" height="80" rx="4" fill="#cfd8dc" stroke="#607d8b"/>
+        <text x="75" y="195" text-anchor="middle" font-size="10.5" font-weight="700" fill="#37474f">KEYBOARD</text>
+        <text x="75" y="255" text-anchor="middle" font-size="10" font-weight="700" fill="#1565c0">viewInsets.bottom = kbd height</text>
+      </g>
+      <path d="M188 150 Q230 150 272 150" fill="none" stroke="#c62828" stroke-width="2" marker-end="url(#a1)"/>
+      <text x="230" y="142" text-anchor="middle" font-size="10.5" font-weight="700" fill="#c62828">opens</text>
+    </svg>
+    <figcaption>Fig 2 · The Scaffold reads viewInsets.bottom and pads the body up by exactly that much — you write nothing</figcaption>
+  </figure>
+
+  <table>
+    <thead><tr><th>Value</th><th>What it is</th><th>Read by</th></tr></thead>
+    <tbody>
+    <tr><td><code>viewInsets</code></td><td><span class="pill blue">dynamic</span> what's covered <em>now</em> — mainly the keyboard. 0 when closed.</td><td><strong>Scaffold</strong> (<code>resizeToAvoidBottomInset</code>)</td></tr>
+    <tr><td><code>viewPadding</code></td><td><span class="pill orange">static</span> notch, status bar, home indicator. Never changes.</td><td><strong>SafeArea</strong></td></tr>
+    <tr><td><code>padding</code></td><td>≈ viewPadding − whatever is currently covered</td><td>(derived)</td></tr>
+    </tbody>
+  </table>
+
+  <div class="box win"><span class="lab">Chat-screen gotchas</span>
+  <p><strong>Keep newest visible:</strong> use <code>ListView(reverse:true)</code> with newest at index 0 — the list sticks to the bottom, so the newest message stays pinned when the keyboard opens.<br>
+  <strong>Double bottom padding:</strong> wrapping in SafeArea while the keyboard is open doubles the gap. Fix: <code>SafeArea(bottom:false)</code> and let the Scaffold own the keyboard side.</p></div>
+</section>
+
+<section id="nav">
+  <span class="sec-num">Section 04</span>
+  <h2 class="sec">Navigation — a stack of pages</h2>
+  <p class="lead"><code>MaterialApp</code> installs a <code>Navigator</code> at the top of your tree and seeds it with your <code>home</code> route. The Navigator manages a <strong>stack</strong>.</p>
+
+  <figure>
+    <svg viewBox="0 0 560 200" xmlns="http://www.w3.org/2000/svg" font-family="JetBrains Mono, monospace">
+      <text x="80" y="22" font-size="12" font-weight="700" fill="#1a1a2e">push() adds on top</text>
+      <rect x="40" y="35" width="170" height="34" rx="6" fill="#fff" stroke="#555" stroke-width="1.5"/>
+      <text x="125" y="57" text-anchor="middle" font-size="12">Home  (route 0)</text>
+      <rect x="60" y="73" width="170" height="34" rx="6" fill="#fff3e8" stroke="#e65100" stroke-width="2"/>
+      <text x="145" y="95" text-anchor="middle" font-size="12">Detail  ← pushed</text>
+      <rect x="80" y="111" width="170" height="34" rx="6" fill="#fff3e8" stroke="#e65100" stroke-width="2"/>
+      <text x="165" y="133" text-anchor="middle" font-size="12">Detail 2  ← pushed</text>
+      <text x="80" y="170" font-size="11.5" fill="#6b6b80">pop() removes the top → reveals the page below, untouched.</text>
+
+      <line x1="300" y1="40" x2="300" y2="140" stroke="#1565c0" stroke-width="1.5"/>
+      <text x="315" y="60" font-size="11.5" fill="#1565c0">top of stack</text>
+      <text x="315" y="135" font-size="11.5" fill="#1565c0">bottom (first opened)</text>
+    </svg>
+    <figcaption>Fig 3 · Lower pages stay alive — hidden, not destroyed — so back is instant and scroll position survives</figcaption>
+  </figure>
+
+  <pre><code><span class="tok-cmt">// push: build a route and add it on top</span>
+Navigator.push(
+  context,
+  MaterialPageRoute(builder: (_) =&gt; DetailPage()),
+);
+
+<span class="tok-cmt">// pop: remove the top route (the auto back-button does this)</span>
+Navigator.pop(context);</code></pre>
+
+  <ul>
+    <li><strong>Navigator</strong> = the stack manager (free from <code>MaterialApp</code>).</li>
+    <li><strong>MaterialPageRoute</strong> = the <em>envelope</em>: it carries the transition animation + auto back-button, and a <code>builder</code> that lazily produces the page. It is <em>not</em> a view the page renders inside.</li>
+    <li><strong>builder</strong> = a lambda returning the page widget, run only when navigating.</li>
+  </ul>
+  <p><span class="mantra">push = call · the awaited future = the return slot · pop's 2nd arg = return value.</span></p>
+</section>
+
+<section id="data">
+  <span class="sec-num">Section 05</span>
+  <h2 class="sec">Passing data down and getting results back</h2>
+
+  <h3>Down — it's just a constructor argument</h3>
+  <p>"Passing data to a screen" is nothing special: a widget takes constructor parameters like any class. Pass the tapped item's <strong>id</strong>.</p>
+  <pre><code>MaterialPageRoute(builder: (_) =&gt; DetailPage(productId: <span class="tok-str">42</span>))</code></pre>
+  <div class="box note"><span class="lab">Big objects aren't expensive</span>
+  <p>Dart passes objects <strong>by reference</strong> — a 100-field object costs the same to pass as an <code>int</code> (one pointer). So "the data is large" is rarely the deciding factor; <strong>who owns it and who already has it</strong> is.</p></div>
+
+  <h3>Back — await the push, return via pop</h3>
+  <pre><code><span class="tok-key">final</span> result = <span class="tok-key">await</span> Navigator.push(context,
+    MaterialPageRoute(builder: (_) =&gt; SelectionPage()));
+<span class="tok-cmt">// pauses here until SelectionPage pops...</span>
+
+<span class="tok-cmt">// inside SelectionPage:</span>
+Navigator.pop(context, <span class="tok-str">'Option A'</span>);  <span class="tok-cmt">// 'Option A' becomes `result`</span></code></pre>
+  <div class="box warn"><span class="lab">Always null-guard</span>
+  <p>System back button / iOS swipe-back / AppBar arrow all pop with <strong>no value</strong> → <code>result == null</code>. Handle it: <code>if (result != null) { ... }</code>.</p></div>
+
+  <h3>The three data-sharing tools — don't over-reach for global state</h3>
+  <table>
+    <thead><tr><th>Tool</th><th>Shape</th><th>Use when</th></tr></thead>
+    <tbody>
+    <tr><td>Constructor</td><td>down, one-way, known at push</td><td>A screen needs a value it already has</td></tr>
+    <tr><td><code>await push</code> + <code>pop(v)</code></td><td>back, once, to the caller, on close</td><td>Destination returns one result on closing</td></tr>
+    <tr><td>Provider (Riverpod)</td><td>shared, live, many readers, survives screens</td><td>Only when the two above genuinely can't express it</td></tr>
+    </tbody>
+  </table>
+  <p><span class="mantra">Navigation is not a data pipe.</span> Its job is "show this screen." Most data passing stays constructor or pop-value; providers are the minority tool for genuinely shared state.</p>
+</section>
+
+<section id="shell">
+  <span class="sec-num">Section 06</span>
+  <h2 class="sec">Bottom-nav shell and preserving tab state</h2>
+  <p class="lead">A bottom nav bar doesn't "navigate" — it <strong>swaps which widget is visible</strong>. Hold an index, show the screen at that index, update on tap.</p>
+
+  <pre><code><span class="tok-cmt">// naive: only the active tab is in the tree</span>
+body: _screens[_currentIndex],   <span class="tok-cmt">// ⚠ off-screen tabs DESTROYED → state lost</span>
+
+<span class="tok-cmt">// fix: keep all tabs mounted, hide inactive ones</span>
+body: IndexedStack(
+  index: _currentIndex,
+  children: const [HomeTab(), SearchTab(), ProfileTab()],
+),</code></pre>
+
+  <div class="twocol">
+    <div class="card bad"><h4>Plain <code>_screens[index]</code></h4>Active tab only in tree → switch away → State disposed → scroll/position <strong>reset</strong> on return.</div>
+    <div class="card good"><h4><code>IndexedStack</code></h4>All tabs stay mounted (just hidden) → State survives → scroll <strong>preserved</strong>. Cost: all build up front.</div>
+  </div>
+
+  <div class="box win"><span class="lab">Best practice for a scaling app</span>
+  <p>Default to <strong>IndexedStack</strong> (3–5 tabs: the up-front cost is trivial). The real scaling fix isn't lazy widgets — it's <strong>separating "widget is built" from "data is loaded."</strong> Keep widget construction cheap; push heavy fetching into the data/provider layer where it's fetched lazily and cached. For one genuinely heavy tab, reach for <code>PageView</code> + <code>AutomaticKeepAliveClientMixin</code> (lazy build + keep-alive).</p></div>
+</section>
+
+<section id="nested">
+  <span class="sec-num">Section 07</span>
+  <h2 class="sec">Nested navigators — the bar that stays put</h2>
+  <p class="lead">Pushes onto <strong>one</strong> Navigator are flat siblings. But a <code>Navigator</code> is just a widget — put another one lower in the tree and you get independent, persistent per-tab stacks.</p>
+
+  <figure>
+    <svg viewBox="0 0 600 240" xmlns="http://www.w3.org/2000/svg" font-family="JetBrains Mono, monospace">
+      <text x="10" y="20" font-size="12" fill="#1a1a2e">MaterialApp</text>
+      <text x="30" y="42" font-size="12" fill="#1565c0">└─ Navigator (ROOT) ← full-screen pushes (login, modals)</text>
+      <text x="55" y="64" font-size="12" fill="#1a1a2e">└─ HomeShell · Scaffold</text>
+      <text x="80" y="86" font-size="12" fill="#1a1a2e">├─ body: IndexedStack</text>
+      <text x="105" y="108" font-size="12" fill="#e65100">│   ├─ Navigator (Home)  ← push Detail HERE: bar stays</text>
+      <text x="105" y="130" font-size="12" fill="#7b1fa2">│   ├─ Navigator (Search)</text>
+      <text x="105" y="152" font-size="12" fill="#2e7d32">│   └─ Navigator (Profile)</text>
+      <text x="80" y="174" font-size="12" fill="#1a1a2e">└─ bottomNavigationBar  ← lives ABOVE the nested navs</text>
+    </svg>
+    <figcaption>Fig 4 · Push onto a nested navigator → bar persists; push onto ROOT → covers everything, bar included</figcaption>
+  </figure>
+
+  <div class="box note"><span class="lab">The decision</span>
+  <p>Want a page to cover the bottom bar (full-screen login)? → push on the <strong>root</strong> Navigator. Want it inside the tab with the bar still showing? → push on the <strong>nested</strong> Navigator. This is exactly what go_router's <code>ShellRoute</code> sets up declaratively.</p></div>
+</section>
+
+<section id="named">
+  <span class="sec-num">Section 08</span>
+  <h2 class="sec">Named routes and why go_router exists</h2>
+  <p class="lead">Named routes register a central <strong>table</strong> of <code>name → builder</code> once, and you push by string: <code>Navigator.pushNamed(context, '/detail')</code>.</p>
+
+  <div class="box warn"><span class="lab">The timing catch</span>
+  <p>The routes table is written at <strong>app boot</strong>, in a place that can't see runtime values. The table builder's signature is fixed by Flutter to <code>(context) → Widget</code> — you can't add an <code>id</code> parameter. So you can't bake <code>productId: 42</code> into it (the tap hasn't happened yet). The workaround — <code>arguments:</code> + <code>ModalRoute.of(context)!.settings.arguments as int</code> — is untyped and casts by hand (crashes at runtime on a wrong type).</p></div>
+
+  <table>
+    <thead><tr><th>Approach</th><th>Centralized?</th><th>Type-safe args?</th><th>Use for</th></tr></thead>
+    <tbody>
+    <tr><td><code>Navigator.push</code> + constructor</td><td>No</td><td><span class="pill green">Yes</span></td><td>Learning, small apps</td></tr>
+    <tr><td>Named routes (raw table)</td><td>Yes</td><td><span class="pill orange">No (casts)</span></td><td>Simple flows, deep links</td></tr>
+    <tr><td><strong>go_router</strong></td><td><span class="pill green">Yes</span></td><td><span class="pill green">Yes</span></td><td>Scaling apps — the production answer</td></tr>
+    </tbody>
+  </table>
+  <p><strong>go_router</strong> is a layer <em>over</em> Navigator (not a replacement) that gives centralized/URL routes <strong>and</strong> type-safe parameters <strong>and</strong> deep-linking + nested nav (<code>ShellRoute</code>) — the exact pains named routes leave behind.</p>
+</section>
+
+<section id="future">
+  <span class="sec-num">Section 09</span>
+  <h2 class="sec">Async — Future, async, await</h2>
+  <p class="lead">A <em class="term">Future</em> is "a value that isn't here yet — or will fail." Like a coffee-shop <strong>buzzer</strong>: handed to you immediately so you can sit down (app stays responsive); later it rings <strong>ready</strong> (value) or <strong>out of beans</strong> (error).</p>
+
+  <div class="box key"><span class="lab">The #1 misconception</span>
+  <p>Async in Dart is <strong>not</strong> multiple threads. It's <strong>one</strong> thread that, instead of blocking during slow I/O, goes off and does other work and comes back when the result is ready. The network wait is handled by the OS; your thread is just notified later. <em>(Real extra threads = <code>Isolate</code>, for heavy CPU work — not for network calls.)</em></p></div>
+
+  <pre><code><span class="tok-fn">Future</span>&lt;<span class="tok-fn">String</span>&gt; fetchUsername() <span class="tok-key">async</span> {   <span class="tok-cmt">// async = "may pause partway"</span>
+  <span class="tok-cmt">// ...network ~800ms...</span>
+  <span class="tok-key">return</span> <span class="tok-str">'vaibhav'</span>;
+}
+
+<span class="tok-key">final</span> name = <span class="tok-key">await</span> fetchUsername();  <span class="tok-cmt">// pause THIS function, free the thread, resume on arrival</span></code></pre>
+
+  <ul>
+    <li><code>Future&lt;String&gt;</code> reads as "a String that isn't here yet."</li>
+    <li><em class="term">async</em> marks a function that may pause; it always returns a Future.</li>
+    <li><em class="term">await</em> = pause <strong>this</strong> function until the Future resolves, unwrap the value, continue. The thread stays free meanwhile. <code>await</code> only works inside <code>async</code>.</li>
+    <li>Two outcomes always: <strong>value</strong> or <strong>error</strong>.</li>
+  </ul>
+</section>
+
+<section id="fb">
+  <span class="sec-num">Section 10</span>
+  <h2 class="sec">FutureBuilder and the three states</h2>
+  <p class="lead">A screen needs three branches for async data — and at any instant it's in exactly one. <code>FutureBuilder</code> binds the Future's state to the UI.</p>
+
+  <figure>
+    <svg viewBox="0 0 560 130" xmlns="http://www.w3.org/2000/svg" font-family="JetBrains Mono, monospace">
+      <rect x="20" y="40" width="150" height="50" rx="10" fill="#e8f1fb" stroke="#1565c0" stroke-width="2"/>
+      <text x="95" y="62" text-anchor="middle" font-size="13" font-weight="700" fill="#1565c0">waiting</text>
+      <text x="95" y="80" text-anchor="middle" font-size="11" fill="#3a3a52">→ spinner</text>
+      <rect x="205" y="40" width="150" height="50" rx="10" fill="#eaf5eb" stroke="#2e7d32" stroke-width="2"/>
+      <text x="280" y="62" text-anchor="middle" font-size="13" font-weight="700" fill="#2e7d32">data</text>
+      <text x="280" y="80" text-anchor="middle" font-size="11" fill="#3a3a52">→ show content</text>
+      <rect x="390" y="40" width="150" height="50" rx="10" fill="#fdecea" stroke="#c62828" stroke-width="2"/>
+      <text x="465" y="62" text-anchor="middle" font-size="13" font-weight="700" fill="#c62828">error</text>
+      <text x="465" y="80" text-anchor="middle" font-size="11" fill="#3a3a52">→ message + retry</text>
+      <text x="280" y="22" text-anchor="middle" font-size="12" fill="#6b6b80">the complete set of states for any async-backed screen</text>
+    </svg>
+    <figcaption>Fig 5 · Three branches, exactly one active at any instant</figcaption>
+  </figure>
+
+  <div class="box warn"><span class="lab">The #1 FutureBuilder bug</span>
+  <p>Calling <code>fetchProduct(42)</code> <strong>inside build</strong> recreates the Future on every rebuild (keyboard opens, parent rebuilds…) → re-fetch + spinner flicker. <strong>Fix:</strong> create the Future <strong>once in <code>initState</code></strong>, store it, and pass the stored reference to <code>FutureBuilder</code>.</p></div>
+
+  <pre><code><span class="tok-key">class</span> _DetailPageState <span class="tok-key">extends</span> State&lt;DetailPage&gt; {
+  <span class="tok-key">late</span> <span class="tok-fn">Future</span>&lt;<span class="tok-fn">Product</span>&gt; _future;          <span class="tok-cmt">// created ONCE</span>
+
+  <span class="tok-key">void</span> initState() {
+    super.initState();
+    _future = fetchProduct(widget.productId);  <span class="tok-cmt">// once, here — not in build</span>
+  }
+
+  <span class="tok-fn">Widget</span> build(context) =&gt; FutureBuilder&lt;<span class="tok-fn">Product</span>&gt;(
+    future: _future,                           <span class="tok-cmt">// pass the REFERENCE, not the call</span>
+    builder: (context, snapshot) {
+      <span class="tok-key">if</span> (snapshot.connectionState == ConnectionState.waiting)
+        <span class="tok-key">return</span> CircularProgressIndicator();   <span class="tok-cmt">// waiting</span>
+      <span class="tok-key">else if</span> (snapshot.hasError)
+        <span class="tok-key">return</span> Text(<span class="tok-str">'Failed: </span>${snapshot.error}<span class="tok-str">'</span>); <span class="tok-cmt">// error</span>
+      <span class="tok-key">else</span>
+        <span class="tok-key">return</span> Text(snapshot.data!.name);         <span class="tok-cmt">// data</span>
+    },
+  );
+}</code></pre>
+
+  <p><strong>Why it works:</strong> <code>initState</code> runs <strong>once</strong>; <code>build</code> runs on <strong>every</strong> rebuild but only passes the stored reference — so the same Future survives. <span class="mantra">Create in initState, reference in build.</span></p>
+  <p><strong>Who re-runs the builder?</strong> FutureBuilder is itself a StatefulWidget; it attaches a listener to the Future, and when the Future resolves it calls <code>setState</code> internally → re-runs your builder with a fresh snapshot. Same setState→rebuild loop you know — just triggered by the Future, not a tap.</p>
+</section>
+
+<section id="riverpod">
+  <span class="sec-num">Section 11</span>
+  <h2 class="sec">Riverpod — the problem it solves</h2>
+  <p class="lead">FutureBuilder is per-screen and throwaway — it can't <strong>share</strong> state. When two screens that are <strong>siblings under the Navigator</strong> both need the same live data, the tree is the wrong place to store it.</p>
+
+  <figure>
+    <svg viewBox="0 0 560 200" xmlns="http://www.w3.org/2000/svg" font-family="JetBrains Mono, monospace">
+      <defs><marker id="a2" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#0b6e6e"/></marker></defs>
+      <rect x="150" y="15" width="260" height="50" rx="12" fill="#e0f2f1" stroke="#0b6e6e" stroke-width="2"/>
+      <text x="280" y="36" text-anchor="middle" font-size="13" font-weight="700" fill="#0b6e6e">Providers — state lives OUTSIDE the tree</text>
+      <text x="280" y="54" text-anchor="middle" font-size="11" fill="#3a3a52">favorites · current user · product cache</text>
+
+      <rect x="40" y="135" width="130" height="46" rx="10" fill="#fff" stroke="#555" stroke-width="1.5"/>
+      <text x="105" y="162" text-anchor="middle" font-size="12">HomeTab</text>
+      <rect x="215" y="135" width="130" height="46" rx="10" fill="#fff" stroke="#555" stroke-width="1.5"/>
+      <text x="280" y="162" text-anchor="middle" font-size="12">DetailPage</text>
+      <rect x="390" y="135" width="130" height="46" rx="10" fill="#fff" stroke="#555" stroke-width="1.5"/>
+      <text x="455" y="162" text-anchor="middle" font-size="12">Any widget</text>
+
+      <line x1="105" y1="133" x2="200" y2="67" stroke="#0b6e6e" stroke-width="1.5" marker-end="url(#a2)"/>
+      <line x1="280" y1="133" x2="280" y2="67" stroke="#0b6e6e" stroke-width="1.5" marker-end="url(#a2)"/>
+      <line x1="455" y1="133" x2="360" y2="67" stroke="#0b6e6e" stroke-width="1.5" marker-end="url(#a2)"/>
+      <text x="280" y="110" text-anchor="middle" font-size="11" fill="#0b6e6e">watch / read — reach sideways, no shared parent needed</text>
+    </svg>
+    <figcaption>Fig 6 · Detail changes the box → the box notifies every watcher → HomeTab rebuilds. The two screens never knew about each other</figcaption>
+  </figure>
+
+  <div class="box note"><span class="lab">When pop-returns-a-value isn't enough</span>
+  <p><code>pop(value)</code> is a <strong>one-shot, one-recipient, on-close</strong> channel. Providers are for: data needed <strong>while both screens are open</strong>; a <strong>third</strong> screen also needs it; or the data must <strong>survive</strong> a screen being disposed. A provider is a cached, singleton-<em>ish</em> box (but disposable &amp; keyable — see families).</p></div>
+</section>
+
+<section id="prov-code">
+  <span class="sec-num">Section 12</span>
+  <h2 class="sec">Riverpod primitives (3.0, code-gen)</h2>
+
+  <h3>Setup — wrap once</h3>
+  <pre><code>runApp(<span class="tok-key">const</span> ProviderScope(child: MyApp()));  <span class="tok-cmt">// the container holding all provider state</span></code></pre>
+
+  <h3>A provider = CounterScreen lifted out of the tree</h3>
+  <pre><code><span class="tok-key">import</span> <span class="tok-str">'package:riverpod_annotation/riverpod_annotation.dart'</span>;
+<span class="tok-key">part</span> <span class="tok-str">'counter_provider.g.dart'</span>;          <span class="tok-cmt">// generated file</span>
+
+@riverpod
+<span class="tok-key">class</span> Counter <span class="tok-key">extends</span> _$Counter {       <span class="tok-cmt">// _$Counter is GENERATED, not written</span>
+  <span class="tok-fn">int</span> build() =&gt; <span class="tok-str">0</span>;                      <span class="tok-cmt">// initial STATE (return type = state type)</span>
+  <span class="tok-key">void</span> increment() =&gt; state++;            <span class="tok-cmt">// YOUR method; assigning state notifies watchers</span>
+}</code></pre>
+
+  <table>
+    <thead><tr><th>Hardcoded contract</th><th>You choose</th></tr></thead>
+    <tbody>
+    <tr><td><code>@riverpod</code>, <code>extends _$YourClass</code>, the <code>part '...g.dart'</code> line, the method named exactly <code>build()</code></td><td>Class name · <code>build()</code>'s return type (= your state type: <code>int</code>, <code>User</code>, <code>Set&lt;int&gt;</code>…) · the initial value · every state-changing method &amp; its name</td></tr>
+    </tbody>
+  </table>
+  <div class="box win"><span class="lab">The fresh-file "error"</span>
+  <p><code>_$Counter</code> doesn't exist until you run <code>dart run build_runner build</code>. A red squiggle on a new provider file is expected until the generator writes the <code>.g.dart</code>.</p></div>
+
+  <h3>Reading state in widgets — watch / read / listen</h3>
+  <pre><code><span class="tok-key">class</span> CounterView <span class="tok-key">extends</span> ConsumerWidget {        <span class="tok-cmt">// Consumer → gives `ref`</span>
+  <span class="tok-fn">Widget</span> build(context, WidgetRef ref) {
+    <span class="tok-key">final</span> count = ref.watch(counterProvider);         <span class="tok-cmt">// subscribe + rebuild</span>
+    <span class="tok-key">return</span> ElevatedButton(
+      onPressed: () =&gt; ref.read(counterProvider.notifier).increment(), <span class="tok-cmt">// act, no subscribe</span>
+      child: Text(<span class="tok-str">'</span>$count<span class="tok-str">'</span>),
+    );
+  }
+}</code></pre>
+
+  <table>
+    <thead><tr><th>Method</th><th>Where</th><th>Does</th></tr></thead>
+    <tbody>
+    <tr><td><code>ref.watch</code></td><td>in <code>build</code></td><td>Subscribe → <strong>rebuild</strong> on change. (display state)</td></tr>
+    <tr><td><code>ref.read</code></td><td>in callbacks</td><td>One-shot read, no subscribe. (act on state)</td></tr>
+    <tr><td><code>ref.listen</code></td><td>in <code>build</code></td><td>On change, run a <strong>side-effect</strong> (snackbar, navigate) — no rebuild.</td></tr>
+    </tbody>
+  </table>
+  <p><span class="mantra">watch = redraw · read = act · listen = react.</span> Also: <code>provider</code> gives the <strong>value</strong>; <code>provider.notifier</code> gives the <strong>object</strong> (to call methods).</p>
+
+  <div class="box warn"><span class="lab">The #1 Riverpod bug — reassign, never mutate</span>
+  <p><code>state.add(id)</code> mutates the same object → Riverpod sees no reassignment → <strong>no notification, UI doesn't update.</strong> Always assign a <strong>new</strong> object:</p>
+  <pre><code>state = {...state, id};        <span class="tok-cmt">// ✓ new Set → watchers notified</span>
+state.add(id);                 <span class="tok-cmt">// ✗ silent: same object, no rebuild</span></code></pre>
+  <p>(Cheap — copying a Set of ids copies pointers, not the products.)</p></div>
+
+  <div class="box win"><span class="lab">Memory — auto-dispose by default</span>
+  <p>Code-gen providers are <strong>auto-disposed</strong>: when no widget watches <code>product(42)</code>, its state is dropped &amp; GC'd. Opt into persistence with <code>@Riverpod(keepAlive: true)</code>. So they don't pile up in memory unless you ask them to.</p></div>
+</section>
+
+<section id="async-prov">
+  <span class="sec-num">Section 13</span>
+  <h2 class="sec">Async providers and AsyncValue — the FutureBuilder upgrade</h2>
+  <p class="lead">A provider's <code>build()</code> can be async. Watching it gives an <em class="term">AsyncValue</em>, whose <code>.when</code> bundles your three states — with no <code>initState</code>, no stored Future, no re-fetch bug.</p>
+
+  <pre><code>@riverpod
+<span class="tok-fn">Future</span>&lt;<span class="tok-fn">Product</span>&gt; product(Ref ref, <span class="tok-fn">int</span> id) {   <span class="tok-cmt">// `id` param → a FAMILY (one box per id)</span>
+  <span class="tok-key">final</span> repo = ref.watch(productRepositoryProvider); <span class="tok-cmt">// inject the repo — don't hardcode the fetch</span>
+  <span class="tok-key">return</span> repo.getById(id);
+}
+
+<span class="tok-cmt">// in the widget:</span>
+<span class="tok-key">final</span> productAsync = ref.watch(productProvider(id));   <span class="tok-cmt">// AsyncValue&lt;Product&gt;</span>
+productAsync.when(
+  loading: ()      =&gt; CircularProgressIndicator(),   <span class="tok-cmt">// = waiting</span>
+  error:   (e, st) =&gt; Text(<span class="tok-str">'Failed: </span>$e<span class="tok-str">'</span>),         <span class="tok-cmt">// = hasError</span>
+  data:    (p)     =&gt; Text(p.name),                  <span class="tok-cmt">// = hasData</span>
+);</code></pre>
+
+  <table>
+    <thead><tr><th>FutureBuilder</th><th>Async provider</th></tr></thead>
+    <tbody>
+    <tr><td>Future created in widget State</td><td>Lives outside the tree, cached per-id</td></tr>
+    <tr><td>Manual <code>if/else</code> on snapshot</td><td><code>.when(loading/error/data)</code></td></tr>
+    <tr><td>Can't share; re-fetch bugs</td><td>Shared across screens; auto-cached</td></tr>
+    <tr><td>Needs initState plumbing</td><td>None</td></tr>
+    </tbody>
+  </table>
+
+  <div class="box key"><span class="lab">Layering — the senior-dev point</span>
+  <p>Don't put <code>fetchProduct()</code> <em>directly</em> in the provider — that conflates two jobs. Keep a clean arrow: <strong>UI → Provider (thin, reactive seam) → Repository (plain class, no Riverpod) → API/DB.</strong> The provider <em>calls</em> an injected repository; it isn't the data layer. The repository stays testable, swappable, reusable. And Riverpod replaces <strong>shared</strong> state — it does <em>not</em> retire <code>StatefulWidget</code>/<code>initState</code>/<code>dispose</code>, which still own controllers, focus nodes, animations, and per-widget ephemeral state. Mature apps use both, deliberately.</p></div>
+</section>
+
+<section id="reload">
+  <span class="sec-num">Section 14</span>
+  <h2 class="sec">Hot Reload vs Hot Restart</h2>
+  <p class="lead">Both are fast dev-iteration features. The difference is what happens to your app's current <strong>state</strong>.</p>
+
+  <table>
+    <thead><tr><th></th><th>Hot Reload <span class="pill green">r</span></th><th>Hot Restart <span class="pill orange">R</span></th></tr></thead>
+    <tbody>
+    <tr><td>Re-runs</td><td><code>build()</code> only</td><td>From <code>main()</code></td></tr>
+    <tr><td>State</td><td><strong>Kept</strong> — same screen, counter still 7</td><td><strong>Wiped</strong> — back to start, counter 0</td></tr>
+    <tr><td><code>initState</code> / <code>main()</code></td><td>Not re-run</td><td>Re-run</td></tr>
+    <tr><td>Use for</td><td>UI tweaks: padding, colors, text, layout</td><td>Changes Reload can't see (below)</td></tr>
+    </tbody>
+  </table>
+
+  <div class="box warn"><span class="lab">When Hot Reload ISN'T enough → Hot Restart</span>
+  <p>Because Reload only re-runs <code>build</code>, it won't reflect changes to <code>main()</code>, <code>initState</code>, a provider's <code>build()</code> initial value, global variables, <code>const</code> initializers, enums, or class fields. <strong>Practical tip:</strong> if something "isn't updating" and your code looks right, try Hot <strong>Restart</strong> before deeper debugging.</p></div>
+  <p><span class="mantra">Reload re-runs build (state survives) · Restart re-runs main (state wiped).</span> Same <code>initState</code>-vs-<code>build</code> split as everywhere else.</p>
+</section>
+
+<section id="cheat">
+  <span class="sec-num">Section 15</span>
+  <h2 class="sec">One-page cheat sheet</h2>
+  <table>
+    <thead><tr><th>Concept</th><th>One line to remember</th></tr></thead>
+    <tbody>
+    <tr><td>Widget / Element / State</td><td>Widget = description · Element = mounted node = context · State = your data, survives rebuilds</td></tr>
+    <tr><td>State resets</td><td>Out of tree → State disposed → data gone</td></tr>
+    <tr><td>context</td><td>Your address; <code>.of(context)</code> walks <strong>up</strong> to find Navigator/Theme/MediaQuery</td></tr>
+    <tr><td>Keyboard</td><td>Scaffold reads <code>viewInsets</code> (dynamic) · SafeArea reads <code>viewPadding</code> (static)</td></tr>
+    <tr><td>Navigation</td><td>push adds, pop removes — the top; lower pages stay alive</td></tr>
+    <tr><td>Data down</td><td>Constructor argument (objects pass by reference — cheap)</td></tr>
+    <tr><td>Data back</td><td><code>await push</code> + <code>pop(value)</code>; null-guard the back button</td></tr>
+    <tr><td>Bottom nav</td><td>Swaps visible widget; <code>IndexedStack</code> preserves tab state</td></tr>
+    <tr><td>Full-screen vs in-tab</td><td>Push on ROOT navigator vs NESTED navigator</td></tr>
+    <tr><td>Production routing</td><td>go_router = centralized + type-safe + deep links</td></tr>
+    <tr><td>Future</td><td>A value not here yet (or an error). One thread, not blocked — freed during the wait</td></tr>
+    <tr><td>async / await</td><td>async = "may pause" · await = pause this function, free the thread, resume on arrival</td></tr>
+    <tr><td>FutureBuilder</td><td>3 states: waiting / data / error. Create Future in <strong>initState</strong>, reference in build</td></tr>
+    <tr><td>Why Riverpod</td><td>Shared, live, surviving state across siblings — the tree can't hold it</td></tr>
+    <tr><td>Provider</td><td>State outside the tree; <code>build()</code> returns initial state; assign <code>state</code> to notify</td></tr>
+    <tr><td>watch / read / listen</td><td>redraw / act / react</td></tr>
+    <tr><td>#1 bug</td><td>Reassign state (<code>state = {...state, id}</code>), never mutate (<code>state.add</code>)</td></tr>
+    <tr><td>AsyncValue</td><td><code>.when(loading, error, data)</code> = your 3 FutureBuilder states, de-boilerplated</td></tr>
+    <tr><td>family</td><td>A provider with a parameter = one cached box per key (<code>product(42)</code>)</td></tr>
+    <tr><td>auto-dispose</td><td>Unwatched providers are dropped; <code>keepAlive:true</code> to persist</td></tr>
+    <tr><td>Layering</td><td>UI → thin Provider → Repository → API. Riverpod ≠ death of StatefulWidget</td></tr>
+    <tr><td>Reload / Restart</td><td>Reload re-runs build (state kept) · Restart re-runs main (state wiped)</td></tr>
+    </tbody>
+  </table>
+</section>
