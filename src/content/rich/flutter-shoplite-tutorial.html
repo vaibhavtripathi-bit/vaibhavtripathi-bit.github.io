@@ -1,0 +1,487 @@
+<style>
+  /* ShopLite tutorial — components the house theme doesn't ship; scoped to .rich-body */
+  .rich-body .lead { font-size: 1.12rem; color: var(--ink-soft); margin-bottom: 18px; }
+  .rich-body .mantra { font-weight: 600; color: var(--ink); background: linear-gradient(transparent 58%, #ffe7a0 58%); padding: 0 2px; }
+  .rich-body h4 { font-family: "Fraunces", Georgia, serif; font-weight: 600; font-size: 17px; letter-spacing: -0.01em; text-transform: none; color: var(--ink); margin: 26px 0 8px; }
+  .rich-body .meta { display: flex; gap: 20px; flex-wrap: wrap; margin: 4px 0 0; font-size: 13px; color: var(--ink-faint); }
+  .rich-body .meta b { color: var(--ink-soft); }
+
+  .rich-body .filelabel { display: flex; align-items: center; gap: 8px; margin: 18px 0 0; font-size: 11.5px; }
+  .rich-body .filelabel .fn { font-family: "JetBrains Mono", monospace; background: #1b1d23; color: #fff; padding: 3px 10px; border-radius: 6px 6px 0 0; font-weight: 600; }
+  .rich-body .filelabel .where { color: var(--ink-faint); font-style: italic; }
+  .rich-body .filelabel + pre { margin-top: 0; border-top-left-radius: 0; }
+
+  .rich-body .slot { border: 2px solid var(--accent2); border-radius: 8px; padding: 6px 20px 16px; margin: 26px 0; background: #f3f8fb; }
+  .rich-body .slot .tag { display: inline-block; transform: translateY(-14px); background: var(--accent2); color: #fff; font-family: "JetBrains Mono", monospace; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; font-weight: 700; padding: 4px 12px; border-radius: 7px; }
+  .rich-body .slot p:last-child { margin-bottom: 0; }
+
+  .rich-body .twocol { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 18px 0; }
+  .rich-body .twocol .card { border: 1px solid var(--rule); border-radius: 6px; padding: 14px 16px; font-size: 15px; }
+  .rich-body .twocol .card h4 { margin: 0 0 6px; font-family: "JetBrains Mono", monospace; font-size: 13px; }
+  .rich-body .twocol .card.bad { background: #fdf3f2; border-color: #ecc7c2; }
+  .rich-body .twocol .card.good { background: #eef6f0; border-color: #c4dfcd; }
+  .rich-body .twocol .card.bad h4 { color: #b5341f; }
+  .rich-body .twocol .card.good h4 { color: var(--accent3); }
+  @media (max-width: 660px) { .rich-body .twocol { grid-template-columns: 1fr; } }
+
+  .rich-body .pill { display: inline-block; font-family: "JetBrains Mono", monospace; font-size: 10.5px; font-weight: 600; padding: 2px 9px; border-radius: 999px; letter-spacing: 0.03em; vertical-align: middle; }
+  .rich-body .pill.b { background: #eef4f8; color: var(--accent2); }
+  .rich-body .pill.g { background: #eef6f0; color: var(--accent3); }
+  .rich-body .pill.o { background: #fdf6e8; color: var(--accent-amber); }
+  .rich-body .pill.p { background: var(--accent-soft); color: var(--accent); }
+</style>
+
+<div class="box note"><span class="lab">The running app</span>
+<p>Throughout, we build <strong>“ShopLite”</strong>: a home screen with a scrollable list of products, a bottom navigation bar, and a detail page that loads a product when you tap a row. Small enough to hold in your head, complete enough to exercise everything: widgets, navigation, async loading, shared state, and layering. Code blocks carry a <code>file name</code> so you always know where the code lives.</p>
+<div class="meta">
+  <span><b>Builds toward:</b> list → tap → detail, loading real(ish) data</span>
+  <span><b>Riverpod:</b> 3.0 (code-gen)</span>
+  <span><b>Assumes:</b> you can program; no Flutter needed</span>
+</div></div>
+
+<div class="box warn"><span class="lab">Scope note</span>
+<p>Part 1 gives just enough widget knowledge to read every code sample here. The <strong>deep</strong> treatment of widget types and their full lifecycles (StatelessWidget, StatefulWidget, ConsumerWidget, ConsumerStatefulWidget, and the 10-step lifecycle: <code>initState → didChangeDependencies → build → didUpdateWidget → deactivate → dispose</code>, plus the <code>mounted</code> guard) is a <strong>separate dedicated tutorial</strong>. Here we cover only what you need to understand the app we build.</p></div>
+
+<section id="p1">
+  <span class="sec-num">Part 1</span>
+  <h2 class="sec">Widget basics — just enough to read every line</h2>
+  <p class="lead">In Flutter, <strong>everything on screen is a widget</strong> — text, a button, padding, a whole screen, even the app itself. You build UI by composing widgets inside widgets, like nesting boxes. A widget’s job is to <em>describe</em> what the UI should look like given some inputs.</p>
+
+  <h3>The widget is a description, not the thing on screen</h3>
+  <p>This is the single most important idea, and it explains nearly every “why did my state reset?” surprise later. A widget object is <strong>cheap and disposable</strong> — Flutter throws it away and rebuilds it constantly. Behind it, Flutter keeps a longer-lived bookkeeping object (the <em>Element</em>) that is the actual node mounted in the tree. And for widgets that hold changing data, there is a third object (the <em>State</em>) that survives across rebuilds.</p>
+  <table>
+    <tr><th>Object</th><th>What it is</th><th>Lifetime</th></tr>
+    <tr><td><span class="pill b">Widget</span></td><td>A description / config (what you write: <code>Text('Hi')</code>)</td><td>Rebuilt constantly, thrown away</td></tr>
+    <tr><td><span class="pill o">Element</span></td><td>The mounted node Flutter manages for you. It is what <code>BuildContext</code> refers to.</td><td>Stays while on screen</td></tr>
+    <tr><td><span class="pill g">State</span></td><td>Where mutable data lives (a counter, a stored Future)</td><td>Survives rebuilds; destroyed when the widget leaves the tree</td></tr>
+  </table>
+  <p>You rarely touch the Element directly — but knowing it exists explains <code>BuildContext</code>: <span class="mantra">context = “where am I in the tree?”</span>. Calls like <code>Theme.of(context)</code> or <code>Navigator.of(context)</code> use your context to walk <em>up</em> the tree and find the nearest Theme or Navigator.</p>
+
+  <h3>The three widget types you’ll see in this tutorial</h3>
+  <p>(There are more, and their full lifecycles are the separate tutorial — here is the working minimum.)</p>
+
+  <h4>1. StatelessWidget — draws from its inputs, never changes itself</h4>
+  <p>Use it when the widget just renders whatever it’s given and has no internal changing data.</p>
+  <div class="filelabel"><span class="fn">example</span><span class="where">a label that only depends on its input</span></div>
+  <pre><code><span class="tok-key">class</span> Greeting <span class="tok-key">extends</span> StatelessWidget {
+  <span class="tok-key">final</span> <span class="tok-fn">String</span> name;
+  <span class="tok-key">const</span> Greeting({<span class="tok-key">super</span>.key, <span class="tok-key">required</span> <span class="tok-key">this</span>.name});
+
+  @override
+  <span class="tok-fn">Widget</span> build(BuildContext context) {
+    <span class="tok-key">return</span> Text(<span class="tok-str">'Hello, '</span> + name);   <span class="tok-cmt">// build() returns the UI description</span>
+  }
+}</code></pre>
+  <p><code>build()</code> is the heart of every widget: it returns the subtree to display. Flutter calls it whenever it needs to (re)render.</p>
+
+  <h4>2. StatefulWidget — has its own changing data</h4>
+  <p>Use it when the widget owns data that changes over time and the UI must update — a counter, a text field’s contents, an animation, a stored Future. It comes in <strong>two classes</strong>: the widget (config) and a <code>State</code> object (the data + <code>build</code>).</p>
+  <div class="filelabel"><span class="fn">example</span><span class="where">the classic counter — data that changes</span></div>
+  <pre><code><span class="tok-key">class</span> Counter <span class="tok-key">extends</span> StatefulWidget {
+  <span class="tok-key">const</span> Counter({<span class="tok-key">super</span>.key});
+  @override
+  State&lt;Counter&gt; createState() =&gt; _CounterState();   <span class="tok-cmt">// makes the State object</span>
+}
+
+<span class="tok-key">class</span> _CounterState <span class="tok-key">extends</span> State&lt;Counter&gt; {
+  <span class="tok-fn">int</span> count = <span class="tok-str">0</span>;                              <span class="tok-cmt">// data lives HERE, survives rebuilds</span>
+
+  @override
+  <span class="tok-fn">Widget</span> build(BuildContext context) {
+    <span class="tok-key">return</span> ElevatedButton(
+      onPressed: () =&gt; setState(() =&gt; count++),  <span class="tok-cmt">// mutate + ask for a rebuild</span>
+      child: Text(<span class="tok-str">'</span>$count<span class="tok-str">'</span>),
+    );
+  }
+}</code></pre>
+  <div class="box note"><span class="lab">What setState actually does</span><p>It changes a field on the <em>State</em>, marks the <em>Element</em> as needing a rebuild, and Flutter re-runs <code>build()</code>. The State survived; only the widget description was regenerated. <strong>If a widget leaves the tree, its State is destroyed</strong> — that’s why an off-screen list resets its scroll unless you keep it mounted (Part 4).</p></div>
+
+  <h4>3. ConsumerWidget — a StatelessWidget that can read Riverpod state</h4>
+  <p>Introduced properly in Part 8. For now: it’s like a StatelessWidget, but its <code>build</code> gets an extra <code>ref</code> handle used to read shared state. Mentioned here only so the later code isn’t a surprise.</p>
+
+  <div class="slot"><span class="tag">In ShopLite</span>
+    <p>Our product rows and detail content will be <strong>StatelessWidget/ConsumerWidget</strong> (they just render what they’re given). The bottom-nav shell will be <strong>StatefulWidget</strong> (it owns the “currently selected tab” — data that changes). That single decision — “does this widget own changing data?” — is how you pick the type every time.</p>
+  </div>
+</section>
+
+<section id="p2">
+  <span class="sec-num">Part 2</span>
+  <h2 class="sec">Navigation — the stack, and one insight everything depends on</h2>
+  <p class="lead">A Flutter app shows one screen, then another “on top,” then you go back. That’s a <strong>stack</strong>, and Flutter manages it with a <code>Navigator</code> that <code>MaterialApp</code> gives you for free.</p>
+
+  <figure>
+    <svg viewBox="0 0 540 150" xmlns="http://www.w3.org/2000/svg" font-family="JetBrains Mono, monospace">
+      <rect x="30" y="30" width="160" height="30" rx="6" fill="#fff" stroke="#555"/>
+      <text x="110" y="50" text-anchor="middle" font-size="12">Home (route 0)</text>
+      <rect x="55" y="64" width="160" height="30" rx="6" fill="#fff4ea" stroke="#e65100" stroke-width="2"/>
+      <text x="135" y="84" text-anchor="middle" font-size="12">Detail ← push()</text>
+      <rect x="80" y="98" width="160" height="30" rx="6" fill="#fff4ea" stroke="#e65100" stroke-width="2"/>
+      <text x="160" y="118" text-anchor="middle" font-size="12">Detail 2 ← push()</text>
+      <text x="280" y="50" font-size="12.5" fill="#1565c0">top = what the user sees</text>
+      <text x="280" y="84" font-size="12.5" fill="#c62828">pop() removes the top</text>
+      <text x="280" y="118" font-size="12.5" fill="#6b6b7b">below = alive, just hidden</text>
+    </svg>
+    <figcaption>Fig 1 · Pages below stay alive (not destroyed), so going back is instant and the previous screen is exactly as you left it</figcaption>
+  </figure>
+
+  <h3>Push and pop</h3>
+  <div class="filelabel"><span class="fn">home_tab.dart</span><span class="where">inside a row’s onTap</span></div>
+  <pre><code>onTap: () {
+  Navigator.push(                                  <span class="tok-cmt">// add a page on top</span>
+    context,
+    MaterialPageRoute(builder: (_) =&gt; DetailPage()),
+  );
+}
+<span class="tok-cmt">// the auto back-button inside DetailPage effectively calls:</span>
+<span class="tok-cmt">// Navigator.pop(context);   // remove the top page</span></code></pre>
+  <p><strong>Navigator</strong> = the stack manager (free from <code>MaterialApp</code>). <strong>MaterialPageRoute</strong> = the “envelope” a page travels in — it carries the slide/fade animation and the automatic back button, and its <code>builder</code> produces the page lazily. <strong>builder</strong> = a function returning the page widget.</p>
+
+  <h3>The insight: pushed pages are <em>siblings</em>, not parent/child</h3>
+  <p>“Detail is on top of Home” describes the stack <em>order</em>. It does <strong>not</strong> mean Detail is nested inside Home in the widget tree. Both attach to the same Navigator:</p>
+  <pre><code>MaterialApp
+  └─ Navigator
+       ├─ Home      <span class="tok-cmt">← route 0</span>
+       └─ Detail    <span class="tok-cmt">← route 1  (SIBLING of Home, not its child)</span></code></pre>
+  <div class="box key"><span class="lab">Remember this — two later topics depend on it</span><p>Because Home and Detail are siblings, <strong>neither can reach into the other’s State.</strong> That single fact is why returning a value needs a special channel (<code>pop(value)</code>, Part 3) and why <em>shared</em> state must live <strong>outside</strong> the tree (Riverpod, Part 8). When those “whys” come up, they trace straight back to here.</p></div>
+
+  <div class="slot"><span class="tag">In ShopLite</span>
+    <p>Tapping a product row <code>push</code>es a <code>DetailPage</code> onto the stack; the back button <code>pop</code>s it. The list underneath stays alive, so returning is instant with scroll intact. We’ll graduate from raw <code>Navigator.push</code> to <strong>go_router</strong> at the end of this part for the production version.</p>
+  </div>
+
+  <h3>Why a real app uses go_router</h3>
+  <p>Raw <code>Navigator.push</code> with a constructor (<code>DetailPage(productId: 42)</code>) is type-safe but scattered across the app. The built-in “named routes” table centralizes routing but forces an untyped argument cast (the table is written at startup, before any value like <code>42</code> exists, and its builder signature is fixed to <code>(context)</code> only). <strong>go_router</strong> resolves the tension: centralized <em>and</em> type-safe, plus deep links and nested shells.</p>
+  <div class="filelabel"><span class="fn">router.dart</span><span class="where">define once; wire into MaterialApp.router; navigate by path</span></div>
+  <pre><code><span class="tok-cmt">// 1) DEFINE</span>
+<span class="tok-key">final</span> router = GoRouter(routes: [
+  GoRoute(path: <span class="tok-str">'/'</span>, builder: (c, s) =&gt; HomeShell()),
+  GoRoute(path: <span class="tok-str">'/detail/:id'</span>, builder: (c, state) {        <span class="tok-cmt">// :id = a value in the URL</span>
+    <span class="tok-key">final</span> id = <span class="tok-fn">int</span>.parse(state.pathParameters[<span class="tok-str">'id'</span>]!);
+    <span class="tok-key">return</span> DetailPage(productId: id);                      <span class="tok-cmt">// clean typed constructor</span>
+  }),
+]);
+<span class="tok-cmt">// 2) WIRE (main.dart):  MaterialApp.router(routerConfig: router);</span>
+<span class="tok-cmt">// 3) NAVIGATE (anywhere):  context.go('/detail/42');</span></code></pre>
+  <div class="box win"><span class="lab">The safety ladder</span><p><code>arguments: Object?</code> (named routes) → runtime cast, can crash · <code>state.pathParameters['id']</code> (go_router) → you parse a string · <strong>typed routes</strong> (go_router code-gen) → fully compile-time checked. String paths are fine to learn; typed routes earn their keep at scale.</p></div>
+</section>
+
+<section id="p3">
+  <span class="sec-num">Part 3</span>
+  <h2 class="sec">Passing data and getting results back</h2>
+  <p class="lead">Two screens need to exchange information. There are exactly three tools, and choosing the right one keeps an app simple.</p>
+  <table>
+    <tr><th>Tool</th><th>Direction &amp; shape</th><th>Use when</th></tr>
+    <tr><td>Constructor — <code>DetailPage(id: 42)</code></td><td>down · one-way · known at push time</td><td>A screen needs a value the caller already has</td></tr>
+    <tr><td><code>await push</code> + <code>pop(value)</code></td><td>back · once · to the caller · on close</td><td>The opened screen returns one result when it closes</td></tr>
+    <tr><td>Provider (Riverpod, Part 8)</td><td>shared · live · many readers · outlives screens</td><td>Only when the two above genuinely can’t express it</td></tr>
+  </table>
+  <div class="filelabel"><span class="fn">home_tab.dart</span><span class="where">awaiting a result from a pushed screen</span></div>
+  <pre><code>onTap: () <span class="tok-key">async</span> {
+  <span class="tok-key">final</span> chosen = <span class="tok-key">await</span> Navigator.push(            <span class="tok-cmt">// pauses here until that screen pops</span>
+    context, MaterialPageRoute(builder: (_) =&gt; FilterPage()),
+  );
+  <span class="tok-key">if</span> (chosen != <span class="tok-key">null</span>) applyFilter(chosen);       <span class="tok-cmt">// always null-guard the back button!</span>
+}
+<span class="tok-cmt">// inside FilterPage:  Navigator.pop(context, 'price');   // the returned value</span></code></pre>
+  <div class="box note"><span class="lab">Two facts that prevent over-engineering</span><p><strong>Large objects are cheap to pass</strong> — Dart passes by reference (one pointer), so “the data is big” is rarely the reason to avoid constructors; <em>who owns the data and who already has it</em> is. <strong>Always null-guard <code>pop</code></strong> — the system back button, iOS swipe-back, and AppBar arrow all pop with <code>null</code>.</p></div>
+  <p><span class="mantra">Navigation is not a data pipe.</span> Its job is “show this screen.” Most passing stays constructor or pop-value; the provider is the minority tool for genuinely shared state.</p>
+  <div class="slot"><span class="tag">In ShopLite</span>
+    <p>The list passes the tapped product’s <code>id</code> <em>down</em> to <code>DetailPage</code> via the constructor — it doesn’t pass the whole product. The detail screen will <em>fetch</em> the full product from that id (Parts 5–9). This “pass an id, fetch the rest” pattern is the backbone of nearly every real list→detail flow.</p>
+  </div>
+</section>
+
+<section id="p4">
+  <span class="sec-num">Part 4</span>
+  <h2 class="sec">The bottom-nav shell — swap screens, keep their state</h2>
+  <p class="lead">A bottom navigation bar doesn’t really “navigate” — it <strong>swaps which widget is visible</strong>. You hold a selected index, show the screen at that index, and update it on tap.</p>
+  <div class="filelabel"><span class="fn">home_shell.dart</span><span class="where">a StatefulWidget — it owns the selected tab (changing data)</span></div>
+  <pre><code><span class="tok-key">class</span> _HomeShellState <span class="tok-key">extends</span> State&lt;HomeShell&gt; {
+  <span class="tok-fn">int</span> _index = <span class="tok-str">0</span>;                                  <span class="tok-cmt">// the changing data → StatefulWidget</span>
+
+  @override
+  <span class="tok-fn">Widget</span> build(BuildContext context) {
+    <span class="tok-key">return</span> Scaffold(
+      body: IndexedStack(                          <span class="tok-cmt">// keeps ALL tabs mounted, shows one</span>
+        index: _index,
+        children: <span class="tok-key">const</span> [HomeTab(), SearchTab(), ProfileTab()],
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _index,
+        onTap: (i) =&gt; setState(() =&gt; _index = i),   <span class="tok-cmt">// change tab → rebuild</span>
+        items: <span class="tok-key">const</span> [ <span class="tok-cmt">/* Home / Search / Profile items */</span> ],
+      ),
+    );
+  }
+}</code></pre>
+  <div class="twocol">
+    <div class="card bad"><h4>body: _screens[_index]</h4>Only the active tab is in the tree. Switch away → that tab’s State is destroyed → scroll position resets when you return.</div>
+    <div class="card good"><h4>IndexedStack</h4>All tabs stay mounted (hidden). State survives → scroll preserved. The right default for a handful of tabs.</div>
+  </div>
+  <div class="box win"><span class="lab">The scaling principle (not premature optimization)</span><p>Don’t fuss over lazy tabs. The real lever is <strong>separating “the widget is built” from “its data is loaded.”</strong> Keep widget construction cheap; push heavy fetching into the provider/repository layer (Parts 8–10) where it’s loaded lazily and cached. Then keeping all tabs mounted costs almost nothing.</p></div>
+  <div class="slot"><span class="tag">In ShopLite</span>
+    <p><code>HomeShell</code> is our only StatefulWidget so far, and rightly so — it owns the selected-tab index, which changes. The Home tab holds the product list; tapping a row pushes the detail page <em>over</em> the whole shell (bar included), because the push goes to the Navigator above the shell.</p>
+  </div>
+</section>
+
+<section id="p5">
+  <span class="sec-num">Part 5</span>
+  <h2 class="sec">Async — loading data without freezing the app</h2>
+  <p class="lead">Fetching a product takes time (say 800ms). The app must stay responsive during that wait. Dart’s answer is the <strong>Future</strong>: “a value that isn’t here yet — or an error.”</p>
+  <p>The mental image is a coffee-shop <strong>buzzer</strong>. You order and get a buzzer immediately (so you sit down — the app keeps running). Later it goes off one of two ways: <em>coffee ready</em> (a value) or <em>out of beans</em> (an error). A <code>Future</code> is that buzzer.</p>
+  <div class="box key"><span class="lab">The thing almost everyone gets wrong</span><p>Async in Dart is <strong>not</strong> multiple threads. It’s <strong>one</strong> thread that, instead of blocking during a slow wait, goes off and does other work and comes back when the result arrives. The OS handles the waiting; your thread is just notified. (Heavy CPU work that genuinely needs another thread uses an <em>Isolate</em> — a separate topic, and not what network calls need.)</p></div>
+  <div class="filelabel"><span class="fn">example</span><span class="where">an async function returns a Future</span></div>
+  <pre><code><span class="tok-fn">Future</span>&lt;<span class="tok-fn">Product</span>&gt; fetchProduct(<span class="tok-fn">int</span> id) <span class="tok-key">async</span> {   <span class="tok-cmt">// async = "this may pause"</span>
+  <span class="tok-key">await</span> Future.delayed(Duration(milliseconds: 800)); <span class="tok-cmt">// pretend network</span>
+  <span class="tok-key">return</span> Product(id: id, name: <span class="tok-str">'Product '</span> + id.toString());
+}
+
+<span class="tok-key">final</span> p = <span class="tok-key">await</span> fetchProduct(42);  <span class="tok-cmt">// pause THIS function, free the thread, resume with the value</span></code></pre>
+  <p><code>Future&lt;Product&gt;</code> reads as “a Product that isn’t here yet.” <code>async</code> marks a function that may pause and always returns a Future. <code>await</code> pauses <em>this</em> function until the Future resolves, freeing the thread to do other things, then resumes with the value. You can only <code>await</code> inside an <code>async</code> function.</p>
+  <div class="slot"><span class="tag">In ShopLite</span>
+    <p>Given a product <code>id</code> from the list tap, we need its full data. That fetch returns a <code>Future&lt;Product&gt;</code>. The next two parts are entirely about turning that Future into something on screen — first the bare-metal way (FutureBuilder), then the production way (Riverpod).</p>
+  </div>
+</section>
+
+<section id="p6">
+  <span class="sec-num">Part 6</span>
+  <h2 class="sec">FutureBuilder — the three states</h2>
+  <p class="lead">A screen backed by async data is always in exactly one of three states, and must show something for each: <strong>waiting</strong>, <strong>data</strong>, or <strong>error</strong>. Learn this as the primitive.</p>
+  <figure>
+    <svg viewBox="0 0 540 66" xmlns="http://www.w3.org/2000/svg" font-family="JetBrains Mono, monospace">
+      <rect x="10" y="13" width="160" height="40" rx="9" fill="#eaf2fc" stroke="#1565c0" stroke-width="2"/>
+      <text x="90" y="38" text-anchor="middle" font-size="13" font-weight="700" fill="#1565c0">waiting → spinner</text>
+      <rect x="190" y="13" width="150" height="40" rx="9" fill="#ebf6ec" stroke="#2e7d32" stroke-width="2"/>
+      <text x="265" y="38" text-anchor="middle" font-size="13" font-weight="700" fill="#2e7d32">data → content</text>
+      <rect x="360" y="13" width="170" height="40" rx="9" fill="#fdeceb" stroke="#c62828" stroke-width="2"/>
+      <text x="445" y="38" text-anchor="middle" font-size="13" font-weight="700" fill="#c62828">error → message</text>
+    </svg>
+    <figcaption>Fig 2 · Three states, exactly one active at any instant</figcaption>
+  </figure>
+  <div class="filelabel"><span class="fn">detail_page.dart</span><span class="where">a StatefulWidget — fetch once in initState, render in build</span></div>
+  <pre><code><span class="tok-key">class</span> _DetailPageState <span class="tok-key">extends</span> State&lt;DetailPage&gt; {
+  <span class="tok-key">late</span> <span class="tok-fn">Future</span>&lt;<span class="tok-fn">Product</span>&gt; _future;             <span class="tok-cmt">// stored once</span>
+
+  @override
+  <span class="tok-key">void</span> initState() {
+    super.initState();
+    _future = fetchProduct(widget.productId);  <span class="tok-cmt">// ✅ created ONCE, here</span>
+  }
+
+  @override
+  <span class="tok-fn">Widget</span> build(BuildContext context) {
+    <span class="tok-key">return</span> FutureBuilder&lt;<span class="tok-fn">Product</span>&gt;(
+      future: _future,                          <span class="tok-cmt">// pass the stored reference, NOT fetchProduct()</span>
+      builder: (context, snap) {
+        <span class="tok-key">if</span> (snap.connectionState == ConnectionState.waiting)
+          <span class="tok-key">return</span> <span class="tok-key">const</span> CircularProgressIndicator();  <span class="tok-cmt">// waiting</span>
+        <span class="tok-key">if</span> (snap.hasError) <span class="tok-key">return</span> Text(<span class="tok-str">'Error'</span>);        <span class="tok-cmt">// error</span>
+        <span class="tok-key">return</span> Text(snap.data!.name);                  <span class="tok-cmt">// data</span>
+      },
+    );
+  }
+}</code></pre>
+  <div class="box warn"><span class="lab">The classic bug — and why initState fixes it</span><p>If you call <code>fetchProduct()</code> <em>inside build</em>, every rebuild (keyboard opening, parent rebuilding, anything) creates a <strong>new</strong> Future → re-fetch → spinner flicker. Creating it once in <code>initState</code> and only passing the stored <em>reference</em> in build means the same Future survives every rebuild. <span class="mantra">Create in initState, reference in build.</span></p></div>
+  <div class="slot"><span class="tag">In ShopLite — and a heads-up</span>
+    <p>This works, and it teaches the three states cleanly. But FutureBuilder can’t <em>share</em> that product with another screen, doesn’t cache it (navigate away and back → re-fetch), and makes you hand-write the initState plumbing. So we learn it as the <strong>primitive</strong>, then upgrade in Part 9. (FutureBuilder is still the right pick for small, local, one-shot async — it’s the <code>setState</code> of the async world.)</p>
+  </div>
+</section>
+
+<section id="p7">
+  <span class="sec-num">Part 7</span>
+  <h2 class="sec">Where state lives — the line that decides everything</h2>
+  <p class="lead">Most confusion about “state management” comes from not separating two kinds of state. Name the kind, and the right tool is obvious.</p>
+  <table>
+    <tr><th>Kind</th><th>Meaning</th><th>Right home</th></tr>
+    <tr><td><span class="pill b">Local (view-mechanics)</span></td><td>Only this widget cares; tied to how it currently looks (is a dropdown open, current carousel page, text being typed, an animation)</td><td><code>StatefulWidget</code> + <code>setState</code></td></tr>
+    <tr><td><span class="pill p">Shared / domain</span></td><td>Needed by several widgets or outlives one screen (logged-in user, cart, favorites, fetched data)</td><td>Riverpod provider (Part 8)</td></tr>
+  </table>
+  <p><strong>The deciding line:</strong> the moment state is needed by widgets that aren’t in a clean parent→child line, the widget tree is the wrong container. Recall Part 2 — pushed screens are <em>siblings under the Navigator</em>. To share via the tree you’d have to lift the state high up and thread it through every constructor in between (“prop drilling”), which doesn’t scale.</p>
+  <div class="box key"><span class="lab">The reframe that makes Riverpod click</span><p>Shared state <strong>doesn’t belong to any one widget — it belongs to the app.</strong> So storing it <em>inside</em> the tree was the wrong move from the start. The fix is to move it <em>outside</em> the tree, into a container any widget can reach regardless of position.</p></div>
+  <div class="box win"><span class="lab">The architect’s nuance</span><p>“Domain logic in the View is bad” is right — domain state belongs in a ViewModel (Part 8), whether one screen or many use it. But genuine <em>view-mechanics</em> (animation/scroll/text controllers, ephemeral UI flags) correctly stay in the View via <code>setState</code> — a ViewModel there is over-engineering. The test: <em>“Could another screen ever care about this value? Is it domain, or just how this widget currently looks?”</em></p></div>
+  <div class="slot"><span class="tag">In ShopLite</span>
+    <p>The selected tab index is local view-mechanics → stays in <code>HomeShell</code>’s State. The product data and (say) a favorites set are shared/domain → they move into Riverpod next. That’s the whole decision, applied.</p>
+  </div>
+</section>
+
+<section id="p8">
+  <span class="sec-num">Part 8</span>
+  <h2 class="sec">Riverpod — state outside the tree, and your ViewModel</h2>
+  <p class="lead">Riverpod stores state <strong>beside</strong> the widget tree, in named containers called <em>providers</em>. Any widget reaches them through a handle called <code>ref</code> — no matter where it sits in the tree, and without depending on <code>context</code>.</p>
+  <figure>
+    <svg viewBox="0 0 540 180" xmlns="http://www.w3.org/2000/svg" font-family="JetBrains Mono, monospace">
+      <defs><marker id="ar" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#0b6e6e"/></marker></defs>
+      <rect x="150" y="12" width="240" height="46" rx="12" fill="#e3f3f3" stroke="#0b6e6e" stroke-width="2"/>
+      <text x="270" y="33" text-anchor="middle" font-size="13" font-weight="700" fill="#0b6e6e">Providers (state OUTSIDE the tree)</text>
+      <text x="270" y="50" text-anchor="middle" font-size="11" fill="#34343f">favorites · current user · product data</text>
+      <rect x="40" y="125" width="120" height="44" rx="10" fill="#fff" stroke="#555"/>
+      <text x="100" y="151" text-anchor="middle" font-size="12">HomeTab</text>
+      <rect x="210" y="125" width="120" height="44" rx="10" fill="#fff" stroke="#555"/>
+      <text x="270" y="151" text-anchor="middle" font-size="12">DetailPage</text>
+      <rect x="380" y="125" width="120" height="44" rx="10" fill="#fff" stroke="#555"/>
+      <text x="440" y="151" text-anchor="middle" font-size="12">Any widget</text>
+      <line x1="100" y1="123" x2="195" y2="60" stroke="#0b6e6e" stroke-width="1.5" marker-end="url(#ar)"/>
+      <line x1="270" y1="123" x2="270" y2="60" stroke="#0b6e6e" stroke-width="1.5" marker-end="url(#ar)"/>
+      <line x1="440" y1="123" x2="345" y2="60" stroke="#0b6e6e" stroke-width="1.5" marker-end="url(#ar)"/>
+      <text x="270" y="100" text-anchor="middle" font-size="11" fill="#0b6e6e">watch / read — reach in from anywhere</text>
+    </svg>
+    <figcaption>Fig 3 · One screen changes the box; the box notifies every watcher; they rebuild. The screens never knew about each other</figcaption>
+  </figure>
+
+  <h3>Why Riverpod and not just setState or InheritedWidget?</h3>
+  <p>Each older tool hits a wall. <code>setState</code> can’t share across widgets. <code>InheritedWidget</code> (what <code>Theme.of</code> uses) shares only <em>down</em> the tree, so the data must sit above every reader, and it’s awkward to mutate and needs <code>context</code>. Riverpod’s key move — <strong>state lives outside the tree</strong> — clears all of it: no tree positioning, no <code>context</code> dependency, built-in reactivity, and it doubles as a clean place for domain logic (a ViewModel).</p>
+  <div class="box note"><span class="lab">Is Riverpod only for shared data? No.</span><p>It does two jobs: <strong>(1) sharing</strong> — reachable from anywhere; and <strong>(2) ViewModel + reactivity</strong> — a home for domain state and logic with automatic UI updates, valuable even on a single screen. A one-screen form with validation still benefits from a Notifier, with no sharing involved.</p></div>
+
+  <h3>The pieces</h3>
+  <div class="filelabel"><span class="fn">main.dart</span><span class="where">wrap the whole app once, so providers have a home</span></div>
+  <pre><code><span class="tok-key">void</span> main() =&gt; runApp(<span class="tok-key">const</span> ProviderScope(child: MyApp()));</code></pre>
+  <div class="filelabel"><span class="fn">favorites_provider.dart</span><span class="where">a provider = your ViewModel (its own file, no widget)</span></div>
+  <pre><code><span class="tok-key">import</span> <span class="tok-str">'package:riverpod_annotation/riverpod_annotation.dart'</span>;
+<span class="tok-key">part</span> <span class="tok-str">'favorites_provider.g.dart'</span>;       <span class="tok-cmt">// generated by build_runner</span>
+
+@riverpod
+<span class="tok-key">class</span> Favorites <span class="tok-key">extends</span> _$Favorites {    <span class="tok-cmt">// _$Favorites is GENERATED, not written</span>
+  @override
+  <span class="tok-fn">Set</span>&lt;<span class="tok-fn">int</span>&gt; build() =&gt; {};                <span class="tok-cmt">// build() = initial state; return type = state type</span>
+
+  <span class="tok-key">void</span> toggle(<span class="tok-fn">int</span> id) =&gt; state =          <span class="tok-cmt">// assigning `state` notifies watchers</span>
+    state.contains(id) ? ({...state}..remove(id)) : {...state, id};
+}</code></pre>
+  <p>Only the contract is fixed: the <code>@riverpod</code> annotation, <code>extends _$YourClass</code>, the <code>part</code> line, and a method named <code>build()</code>. You choose everything else — the state type (the return type of <code>build</code>), the initial value, and every method that changes state.</p>
+  <div class="filelabel"><span class="fn">favorite_button.dart</span><span class="where">a ConsumerWidget — the View reads &amp; acts</span></div>
+  <pre><code><span class="tok-key">class</span> FavoriteButton <span class="tok-key">extends</span> ConsumerWidget {
+  <span class="tok-key">final</span> <span class="tok-fn">int</span> id;
+  <span class="tok-key">const</span> FavoriteButton({<span class="tok-key">super</span>.key, <span class="tok-key">required</span> <span class="tok-key">this</span>.id});
+
+  @override
+  <span class="tok-fn">Widget</span> build(BuildContext c, WidgetRef ref) {
+    <span class="tok-key">final</span> isFav = ref.watch(favoritesProvider).contains(id);  <span class="tok-cmt">// watch → rebuild on change</span>
+    <span class="tok-key">return</span> IconButton(
+      icon: Icon(isFav ? Icons.favorite : Icons.favorite_border),
+      onPressed: () =&gt; ref.read(favoritesProvider.notifier).toggle(id), <span class="tok-cmt">// read → act</span>
+    );
+  }
+}</code></pre>
+  <table>
+    <tr><th>ref method</th><th>Where</th><th>Does</th></tr>
+    <tr><td><code>ref.watch</code></td><td>in <code>build</code></td><td>subscribe → <strong>redraw</strong> on change</td></tr>
+    <tr><td><code>ref.read</code></td><td>in callbacks</td><td>one-shot → <strong>act</strong>, no subscribe</td></tr>
+    <tr><td><code>ref.listen</code></td><td>in <code>build</code></td><td>on change → <strong>react</strong> (snackbar, navigate), no rebuild</td></tr>
+  </table>
+  <p><span class="mantra">watch = redraw · read = act · listen = react.</span> Read the value via <code>provider</code>; call methods via <code>provider.notifier</code>. The Notifier class <strong>is your ViewModel</strong> — for one screen or many.</p>
+  <div class="box warn"><span class="lab">The #1 Riverpod bug — reassign, never mutate</span><p><code>state.add(id)</code> changes the same object, so Riverpod sees no new value and <strong>doesn’t notify</strong> — the UI won’t update. Always assign a <strong>new</strong> object: <code>state = {...state, id}</code>. (Cheap: it copies references, not the underlying data.)</p></div>
+  <div class="box win"><span class="lab">Memory</span><p>Generated providers <strong>auto-dispose</strong> when nothing watches them (freed automatically). Add <code>@Riverpod(keepAlive: true)</code> to keep one alive. A provider with a parameter is a <em>family</em> — one cached instance per key, e.g. <code>product(42)</code>.</p></div>
+  <div class="slot"><span class="tag">In ShopLite</span>
+    <p>A <code>FavoriteButton</code> on the detail page toggles a favorite; the heart icon on the matching <em>list</em> row updates at the same time — two sibling screens, communicating through the provider, never referencing each other. That’s the payoff the sibling insight (Part 2) set up.</p>
+  </div>
+</section>
+
+<section id="p9">
+  <span class="sec-num">Part 9</span>
+  <h2 class="sec">Async with Riverpod — AsyncValue, the FutureBuilder upgrade</h2>
+  <p class="lead">A provider’s <code>build()</code> can be asynchronous. Watching it gives an <strong>AsyncValue</strong>, whose <code>.when</code> expresses the same three states from Part 6 — but with no <code>initState</code>, no stored Future, no re-fetch bug, and it’s shared and cached.</p>
+  <div class="filelabel"><span class="fn">product_provider.dart</span><span class="where">async provider; the id parameter makes it a family</span></div>
+  <pre><code>@riverpod
+<span class="tok-fn">Future</span>&lt;<span class="tok-fn">Product</span>&gt; product(Ref ref, <span class="tok-fn">int</span> id) {
+  <span class="tok-key">return</span> ref.watch(productRepositoryProvider).getById(id); <span class="tok-cmt">// calls the repository (Part 10)</span>
+}</code></pre>
+  <div class="filelabel"><span class="fn">detail_page.dart</span><span class="where">a ConsumerWidget — watch the async provider, switch on its states</span></div>
+  <pre><code>@override
+<span class="tok-fn">Widget</span> build(BuildContext c, WidgetRef ref) {
+  <span class="tok-key">final</span> productAsync = ref.watch(productProvider(productId)); <span class="tok-cmt">// AsyncValue&lt;Product&gt;</span>
+  <span class="tok-key">return</span> productAsync.when(
+    loading: () =&gt; <span class="tok-key">const</span> CircularProgressIndicator(),  <span class="tok-cmt">// = FutureBuilder waiting</span>
+    error:   (e, _) =&gt; Text(<span class="tok-str">'Error: '</span> + e.toString()),     <span class="tok-cmt">// = hasError</span>
+    data:    (p) =&gt; Text(p.name),                          <span class="tok-cmt">// = hasData</span>
+  );
+}</code></pre>
+  <table>
+    <tr><th>FutureBuilder (Part 6)</th><th>Async provider (here)</th></tr>
+    <tr><td>Future created in widget State</td><td>Lives outside the tree, cached per id</td></tr>
+    <tr><td>Manual <code>if/else</code> on a snapshot</td><td><code>.when(loading / error / data)</code></td></tr>
+    <tr><td>Can’t share; refetches on return</td><td>Shared across screens; cached</td></tr>
+    <tr><td>You write the initState plumbing</td><td>None</td></tr>
+  </table>
+  <div class="slot"><span class="tag">In ShopLite</span>
+    <p>The detail page now watches <code>productProvider(id)</code>. Open product 42, go back, open it again — it’s cached, no second fetch. Need <code>ref</code> <em>and</em> a controller (e.g. a scroll controller) on the same screen? Use <code>ConsumerStatefulWidget</code> — the type that has both. Now we give that <code>getById</code> a proper home.</p>
+  </div>
+</section>
+
+<section id="p10">
+  <span class="sec-num">Part 10</span>
+  <h2 class="sec">Layered architecture — the repository and the one rule</h2>
+  <p class="lead">So far the provider fetched data itself. In a real app that mixes two jobs — “where data comes from” and “reactive state for the UI.” We separate them into layers, with one rule that makes the whole thing testable and swappable.</p>
+  <pre><code>PRESENTATION  widgets (ConsumerWidget)     <span class="tok-cmt">— paints, handles taps</span>
+     │ watches
+APPLICATION   providers = ViewModel         <span class="tok-cmt">— reactive state, the seam</span>
+     │ calls
+DATA          repository → API / DB         <span class="tok-cmt">— where data comes from</span></code></pre>
+  <p><strong>The one rule: dependencies point downward only.</strong> Presentation knows Application; Application knows Data; never the reverse. In particular, the repository imports <em>nothing</em> from above — no Flutter, no Riverpod.</p>
+  <div class="box key"><span class="lab">Why the repository must not import the provider</span><p>An upward import creates a <strong>circular dependency</strong> and <strong>chains the repository to Riverpod</strong> — which is exactly what destroys the isolation that lets you unit-test it alone and swap its implementation. The benefits (testability, swappability) are not separate gifts; they are the direct result of “imports nothing from above.”</p></div>
+
+  <h3>Repository = interface + implementation</h3>
+  <p>This is plain Dependency Inversion: depend on an <em>interface</em> (what we ask for), not a concrete class (how it’s done). The provider depends on the interface, so the implementation can be swapped — real API in production, a fake in tests — without touching the provider or UI.</p>
+  <div class="filelabel"><span class="fn">data/product_repository.dart</span><span class="where">pure Dart — imports only the model</span></div>
+  <pre><code><span class="tok-key">abstract interface class</span> ProductRepository {   <span class="tok-cmt">// the contract (the "what")</span>
+  <span class="tok-fn">Future</span>&lt;<span class="tok-fn">Product</span>&gt; getById(<span class="tok-fn">int</span> id);
+}</code></pre>
+  <div class="filelabel"><span class="fn">data/api_product_repository.dart</span><span class="where">one implementation (the "how")</span></div>
+  <pre><code><span class="tok-key">class</span> ApiProductRepository <span class="tok-key">implements</span> ProductRepository {
+  @override
+  <span class="tok-fn">Future</span>&lt;<span class="tok-fn">Product</span>&gt; getById(<span class="tok-fn">int</span> id) <span class="tok-key">async</span> {
+    <span class="tok-key">await</span> Future.delayed(<span class="tok-key">const</span> Duration(milliseconds: 800));
+    <span class="tok-key">return</span> Product(id: id, name: <span class="tok-str">'Product '</span> + id.toString());
+  }
+}</code></pre>
+
+  <h3>Injecting it — Riverpod is the DI mechanism</h3>
+  <p>Instead of a DI container (like Hilt or Spring), one tiny provider hands out the repository. Its return type is the <em>interface</em>; it returns the <em>concrete</em> class. This is the single place the concrete implementation is named.</p>
+  <div class="filelabel"><span class="fn">data/repository_providers.dart</span><span class="where">the injection seam — swap the impl here, or override in tests</span></div>
+  <pre><code>@riverpod
+ProductRepository productRepository(Ref ref) {
+  <span class="tok-key">return</span> ApiProductRepository();   <span class="tok-cmt">// the ONE place the concrete class is named</span>
+}</code></pre>
+  <div class="box win"><span class="lab">The payoff in tests</span><p>Riverpod lets you <em>override</em> a provider at the scope level:</p>
+  <pre><code>ProviderScope(overrides: [
+  productRepositoryProvider.overrideWithValue(FakeProductRepository()),
+], child: MyApp());</code></pre>
+  <p>Now everything runs against a fast, predictable fake — and neither the ViewModel nor the UI changed. They asked for “a ProductRepository”; they can’t tell it’s fake. That is the entire reason for the interface + injection.</p></div>
+  <div class="slot"><span class="tag">In ShopLite</span>
+    <p>The Data layer is three files: the interface, the API implementation, and the seam provider. The product provider (Part 9) gets its repository via <code>ref.watch(productRepositoryProvider)</code>. The dependency arrow points one way: UI → product provider → repository provider → repository → network.</p>
+  </div>
+</section>
+
+<section id="p11">
+  <span class="sec-num">Part 11</span>
+  <h2 class="sec">The whole app, traced — one request through every layer</h2>
+  <p class="lead">Everything connects. Here is what happens when the user taps a product and the detail page opens, layer by layer.</p>
+  <figure>
+    <svg viewBox="0 0 540 230" xmlns="http://www.w3.org/2000/svg" font-family="JetBrains Mono, monospace">
+      <defs><marker id="d1" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#34343f"/></marker></defs>
+      <rect x="120" y="10" width="300" height="36" rx="8" fill="#eaf2fc" stroke="#1565c0"/>
+      <text x="270" y="33" text-anchor="middle" font-size="12.5">View: ref.watch(productProvider(42))</text>
+      <rect x="120" y="62" width="300" height="36" rx="8" fill="#f6ebfa" stroke="#7b1fa2"/>
+      <text x="270" y="85" text-anchor="middle" font-size="12.5">ViewModel: product provider runs</text>
+      <rect x="120" y="114" width="300" height="36" rx="8" fill="#e3f3f3" stroke="#0b6e6e"/>
+      <text x="270" y="137" text-anchor="middle" font-size="12.5">DI seam: returns ApiProductRepository</text>
+      <rect x="120" y="166" width="300" height="36" rx="8" fill="#fff4ea" stroke="#e65100"/>
+      <text x="270" y="189" text-anchor="middle" font-size="12.5">Repository: getById(42) → network 800ms</text>
+      <line x1="270" y1="46" x2="270" y2="60" stroke="#34343f" marker-end="url(#d1)"/>
+      <line x1="270" y1="98" x2="270" y2="112" stroke="#34343f" marker-end="url(#d1)"/>
+      <line x1="270" y1="150" x2="270" y2="164" stroke="#34343f" marker-end="url(#d1)"/>
+      <text x="60" y="33" font-size="11" fill="#1565c0">UI</text>
+      <text x="22" y="85" font-size="11" fill="#7b1fa2">App</text>
+      <text x="40" y="137" font-size="11" fill="#0b6e6e">Data</text>
+      <text x="40" y="189" font-size="11" fill="#e65100">Data</text>
+    </svg>
+    <figcaption>Fig 4 · Down the arrow on the way in; the Future resolves and flows back up as an AsyncValue, flipping the UI from spinner to content</figcaption>
+  </figure>
+  <pre><code>User opens DetailPage(productId: 42)              <span class="tok-cmt">[Presentation]</span>
+  → ref.watch(productProvider(42))
+     → product provider: ref.watch(productRepositoryProvider)   <span class="tok-cmt">[Application]</span>
+        → seam returns ApiProductRepository       <span class="tok-cmt">[Data — injection]</span>
+           → getById(42) → 800ms network          <span class="tok-cmt">[Data — implementation]</span>
+  ← Future resolves with a Product
+  ← productProvider's AsyncValue flips loading → data
+  ← View rebuilds; .when() shows the product name</code></pre>
+  <p>The dependency arrow points one way the whole time: <strong>Presentation → Application → Data → network</strong>. The View knows the ViewModel; the ViewModel knows the repository <em>interface</em>; the repository knows the network. Nothing points back up, the repository files import no framework, and swapping the implementation (or overriding it in a test) changes nothing above it.</p>
+  <div class="box key"><span class="lab">The two ideas everything rested on</span><p><strong>①</strong> Pushed pages are <em>siblings under the Navigator</em> — so passing values and sharing state both have to work around the tree. <strong>②</strong> Shared state doesn’t belong to any widget — so it lives <em>outside</em> the tree. go_router solves the navigation side; Riverpod solves the state side; layering keeps it all testable.</p></div>
+</section>

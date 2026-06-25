@@ -25,7 +25,7 @@ export const TAXONOMY = [
     topics: [
       { name: "Android", subs: ["UI", "Performance", "Jetpack Compose", "Networking", "Testing"] },
       { name: "iOS", subs: ["SwiftUI", "Concurrency", "UIKit"] },
-      { name: "Flutter", subs: ["Navigation", "Async", "State Management"] },
+      { name: "Flutter", subs: ["Navigation", "Async", "State Management", "Architecture"] },
       { name: "Kotlin", subs: ["Coroutines", "Flow"] },
       { name: "Swift", subs: [] },
       { name: "Jetpack Compose", subs: [] },
