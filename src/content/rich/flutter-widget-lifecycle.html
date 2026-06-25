@@ -1,0 +1,280 @@
+<style>
+  /* Widget lifecycle deep-dive — components the house theme doesn't ship; scoped to .rich-body */
+  .rich-body .lead { font-size: 1.12rem; color: var(--ink-soft); margin-bottom: 18px; }
+  .rich-body .mantra { font-weight: 600; color: var(--ink); background: linear-gradient(transparent 58%, #ffe7a0 58%); padding: 0 2px; }
+  .rich-body h4 { font-family: "Fraunces", Georgia, serif; font-weight: 600; font-size: 17px; letter-spacing: -0.01em; text-transform: none; color: var(--ink); margin: 24px 0 8px; }
+
+  .rich-body .filelabel { display: flex; align-items: center; gap: 8px; margin: 18px 0 0; font-size: 11.5px; }
+  .rich-body .filelabel .fn { font-family: "JetBrains Mono", monospace; background: #1b1d23; color: #fff; padding: 3px 10px; border-radius: 6px 6px 0 0; font-weight: 600; }
+  .rich-body .filelabel .where { color: var(--ink-faint); font-style: italic; }
+  .rich-body .filelabel + pre { margin-top: 0; border-top-left-radius: 0; }
+
+  .rich-body .teach { border: 2px dashed #c9a86a; background: #fffdf6; border-radius: 8px; padding: 14px 18px; margin: 22px 0; }
+  .rich-body .teach .tag { display: block; font-family: "JetBrains Mono", monospace; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; font-weight: 700; color: #b07d1a; margin-bottom: 6px; }
+  .rich-body .teach ol { margin: 6px 0 0; padding-left: 20px; }
+  .rich-body .teach li { margin: 4px 0; color: var(--ink-soft); }
+
+  .rich-body .twocol { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 18px 0; }
+  .rich-body .twocol .card { border: 1px solid var(--rule); border-radius: 6px; padding: 14px 16px; font-size: 15px; }
+  .rich-body .twocol .card h4 { margin: 0 0 6px; font-family: "JetBrains Mono", monospace; font-size: 13px; }
+  .rich-body .twocol .card.bad { background: #fdf3f2; border-color: #ecc7c2; }
+  .rich-body .twocol .card.good { background: #eef6f0; border-color: #c4dfcd; }
+  .rich-body .twocol .card.bad h4 { color: #b5341f; }
+  .rich-body .twocol .card.good h4 { color: var(--accent3); }
+  @media (max-width: 660px) { .rich-body .twocol { grid-template-columns: 1fr; } }
+
+  .rich-body .pill { display: inline-block; font-family: "JetBrains Mono", monospace; font-size: 10.5px; font-weight: 600; padding: 2px 9px; border-radius: 999px; letter-spacing: 0.03em; vertical-align: middle; }
+  .rich-body .pill.b { background: #eef4f8; color: var(--accent2); }
+  .rich-body .pill.g { background: #eef6f0; color: var(--accent3); }
+  .rich-body .pill.o { background: #fdf6e8; color: var(--accent-amber); }
+  .rich-body .pill.p { background: var(--accent-soft); color: var(--accent); }
+
+  .rich-body td .once, .rich-body .once { color: #b5341f; font-weight: 700; }
+  .rich-body td .many, .rich-body .many { color: var(--accent2); font-weight: 700; }
+  .rich-body td .rare, .rich-body .rare { color: var(--ink-faint); font-weight: 700; }
+  .rich-body td.once { color: #b5341f; font-weight: 700; }
+  .rich-body td.many { color: var(--accent2); font-weight: 700; }
+  .rich-body td.rare { color: var(--ink-faint); font-weight: 700; }
+</style>
+
+<div class="box note"><span class="lab">Prerequisite</span>
+<p>This assumes the widget / element / state idea from the main tutorial’s Part 1. One-line recap: a <strong>Widget</strong> is a disposable description, the <strong>Element</strong> is the mounted node Flutter manages (it is the <code>BuildContext</code>), and the <strong>State</strong> is the long-lived object holding mutable data. The lifecycle is the story of the <strong>State</strong> object’s life.</p></div>
+
+<section id="types">
+  <span class="sec-num">Section 01</span>
+  <h2 class="sec">The four widget types — and how to pick</h2>
+  <p class="lead">You choose a widget type by answering two yes/no questions: <strong>does it own changing data?</strong> and <strong>does it read Riverpod state?</strong></p>
+  <table>
+    <tr><th>Type</th><th>Owns changing data?</th><th>Reads Riverpod?</th><th>Has a lifecycle?</th></tr>
+    <tr><td><code>StatelessWidget</code></td><td>No</td><td>No</td><td>No — just <code>build</code></td></tr>
+    <tr><td><code>StatefulWidget</code></td><td>Yes</td><td>No</td><td>Yes — full lifecycle on its State</td></tr>
+    <tr><td><code>ConsumerWidget</code></td><td>No</td><td>Yes (<code>ref</code>)</td><td>No — just <code>build(c, ref)</code></td></tr>
+    <tr><td><code>ConsumerStatefulWidget</code></td><td>Yes</td><td>Yes (<code>ref</code>)</td><td>Yes — full lifecycle + <code>ref</code></td></tr>
+  </table>
+  <p>Read it as a 2×2: “changing data?” picks Stateless vs Stateful; “reads Riverpod?” adds the <code>Consumer</code> prefix. <strong>ConsumerStatefulWidget</strong> is the corner you reach for when a screen needs <em>both</em> a Riverpod <code>ref</code> <em>and</em> genuine view-mechanics like an <code>AnimationController</code> or <code>TextEditingController</code>.</p>
+  <div class="box win"><span class="lab">The deciding question, restated</span><p>“Changing data” means data that mutates over this widget’s life and must trigger a redraw — a counter, typed text, an animation value, a stored Future. If there’s none, it’s Stateless(/Consumer). If there is, it’s Stateful(/ConsumerStateful). Add the <code>Consumer</code> prefix only when you actually call <code>ref</code>.</p></div>
+</section>
+
+<section id="wheremethods">
+  <span class="sec-num">Section 02</span>
+  <h2 class="sec">Where the methods live — Widget vs State</h2>
+  <p class="lead">The single most common confusion: people think <code>build</code> and <code>initState</code> belong to “the widget.” For a StatefulWidget they do <strong>not</strong> — they live on the separate <code>State</code> object.</p>
+  <div class="filelabel"><span class="fn">detail_page.dart</span><span class="where">two classes — see what each owns</span></div>
+  <pre><code><span class="tok-key">class</span> DetailPage <span class="tok-key">extends</span> StatefulWidget {     <span class="tok-cmt">// the WIDGET = dumb config holder</span>
+  <span class="tok-key">final</span> <span class="tok-fn">int</span> productId;                           <span class="tok-cmt">// the config it carries</span>
+  <span class="tok-key">const</span> DetailPage({<span class="tok-key">super</span>.key, <span class="tok-key">required</span> <span class="tok-key">this</span>.productId});
+
+  @override
+  State&lt;DetailPage&gt; createState() =&gt; _DetailPageState(); <span class="tok-cmt">// the ONLY method here</span>
+}
+
+<span class="tok-key">class</span> _DetailPageState <span class="tok-key">extends</span> State&lt;DetailPage&gt; { <span class="tok-cmt">// the STATE = data + ALL lifecycle</span>
+  @override <span class="tok-key">void</span> initState() { ... }
+  @override <span class="tok-key">void</span> didChangeDependencies() { ... }
+  @override <span class="tok-fn">Widget</span> build(BuildContext c) { ... }   <span class="tok-cmt">// ← build lives HERE, not on the widget</span>
+  @override <span class="tok-key">void</span> didUpdateWidget(DetailPage old) { ... }
+  @override <span class="tok-key">void</span> dispose() { ... }
+}</code></pre>
+  <div class="box key"><span class="lab">The rule</span><p><strong>StatefulWidget</strong> = config fields + <code>createState()</code>, nothing more. <strong>State</strong> = the mutable data <em>and</em> every lifecycle method, including <code>build</code>. The widget is rebuilt and thrown away constantly; the State persists — so the durable logic belongs on the State.</p></div>
+  <p>Why the “both” illusion happens: the <strong>StatelessWidget</strong> <em>does</em> put <code>build</code> on the widget itself — because it has no State object at all. So the two cases differ:</p>
+  <div class="twocol">
+    <div class="card"><h4>StatelessWidget</h4>No State object. <code>build</code> is on the widget. No <code>initState</code>/<code>dispose</code> — nothing durable to set up or tear down.</div>
+    <div class="card"><h4>StatefulWidget</h4>Two classes. Widget = config + <code>createState</code>. State = <code>build</code> + the full lifecycle.</div>
+  </div>
+  <p>From the State object you reach the widget’s config via <code>widget.</code> — e.g. <code>widget.productId</code>. That’s how constructor data crosses from the (disposable) widget into the (durable) State.</p>
+  <div class="teach"><span class="tag">Teach-back</span><ol>
+    <li>On a StatefulWidget, which class owns <code>build</code> and <code>initState</code>?</li>
+    <li>Why does StatelessWidget have no <code>initState</code>?</li>
+  </ol></div>
+</section>
+
+<section id="identity">
+  <span class="sec-num">Section 03</span>
+  <h2 class="sec">Widget identity — does Flutter reuse the State?</h2>
+  <p class="lead">When a parent rebuilds, it produces fresh widget objects. For each spot, Flutter asks: “is this the <em>same</em> widget as before, just reconfigured — or a different one?” The answer decides whether the State is reused or destroyed.</p>
+  <p>The rule: Flutter compares <strong><code>runtimeType</code> + position</strong> (and <code>key</code>, if present).</p>
+  <table>
+    <tr><th>Transition at a spot</th><th>Flutter’s verdict</th><th>What happens to State</th></tr>
+    <tr><td><code>DetailPage(id:1)</code> → <code>DetailPage(id:2)</code></td><td>Same type → “same widget, new config”</td><td><span class="pill g">Reused</span> · <code>didUpdateWidget</code> fires</td></tr>
+    <tr><td><code>DetailPage()</code> → <code>LoginPage()</code></td><td>Different type → “different widget”</td><td><span class="pill o">Destroyed &amp; replaced</span> · old <code>dispose</code>, new <code>initState</code></td></tr>
+  </table>
+  <div class="box warn"><span class="lab">Clear up the common misread</span><p>Different types do <strong>NOT</strong> share State. A <code>DetailPage</code>→<code>LoginPage</code> change is a <strong>full teardown</strong>: the old State’s <code>dispose()</code> runs, then a brand-new State is created for <code>LoginPage</code> and its <code>initState()</code> runs. Only a <em>same-type</em> change reuses State (and that is exactly the <code>didUpdateWidget</code> case).</p></div>
+  <p><span class="mantra">Same type at a spot → reuse State (didUpdateWidget). Different type → dispose old, init new.</span></p>
+  <p>The <code>key</code> exists to override this when the default isn’t what you want — e.g. forcing Flutter to treat a same-type widget as “different” (rebuild fresh), or to track identity when reordering a list. Keys are their own topic; for now just know they are the lever on this identity rule.</p>
+  <div class="teach"><span class="tag">Teach-back</span><ol>
+    <li>A spot changes from <code>ProfilePage</code> to <code>SettingsPage</code> — reused or destroyed? Which two lifecycle methods fire?</li>
+  </ol></div>
+</section>
+
+<section id="lifecycle">
+  <span class="sec-num">Section 04</span>
+  <h2 class="sec">The full lifecycle — all ten, in firing order</h2>
+  <figure>
+    <svg viewBox="0 0 560 300" xmlns="http://www.w3.org/2000/svg" font-family="JetBrains Mono, monospace">
+      <defs><marker id="lc" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#34343f"/></marker></defs>
+      <rect x="180" y="8" width="200" height="30" rx="7" fill="#fdeceb" stroke="#c62828"/>
+      <text x="280" y="28" text-anchor="middle" font-size="12">createState() · once</text>
+      <rect x="180" y="48" width="200" height="30" rx="7" fill="#fdeceb" stroke="#c62828"/>
+      <text x="280" y="68" text-anchor="middle" font-size="12">initState() · once</text>
+      <rect x="180" y="88" width="200" height="30" rx="7" fill="#eaf2fc" stroke="#1565c0"/>
+      <text x="280" y="108" text-anchor="middle" font-size="12">didChangeDependencies()</text>
+      <rect x="180" y="128" width="200" height="30" rx="7" fill="#ebf6ec" stroke="#2e7d32"/>
+      <text x="280" y="148" text-anchor="middle" font-size="12">build() · many</text>
+      <rect x="180" y="168" width="200" height="30" rx="7" fill="#eaf2fc" stroke="#1565c0"/>
+      <text x="280" y="188" text-anchor="middle" font-size="12">didUpdateWidget() · on new config</text>
+      <rect x="180" y="222" width="200" height="30" rx="7" fill="#f4f4f7" stroke="#6b6b7b"/>
+      <text x="280" y="242" text-anchor="middle" font-size="12">deactivate() · rare</text>
+      <rect x="180" y="262" width="200" height="30" rx="7" fill="#fdeceb" stroke="#c62828"/>
+      <text x="280" y="282" text-anchor="middle" font-size="12">dispose() · once</text>
+      <line x1="280" y1="38" x2="280" y2="46" stroke="#34343f" marker-end="url(#lc)"/>
+      <line x1="280" y1="78" x2="280" y2="86" stroke="#34343f" marker-end="url(#lc)"/>
+      <line x1="280" y1="118" x2="280" y2="126" stroke="#34343f" marker-end="url(#lc)"/>
+      <line x1="280" y1="222" x2="280" y2="200" stroke="#34343f" marker-end="url(#lc)"/>
+      <line x1="280" y1="252" x2="280" y2="260" stroke="#34343f" marker-end="url(#lc)"/>
+      <path d="M180 143 C120 143 120 188 178 188" fill="none" stroke="#1565c0" stroke-dasharray="3 3" marker-end="url(#lc)"/>
+      <text x="95" y="168" font-size="10" fill="#1565c0">new config</text>
+      <path d="M380 143 C440 143 440 105 382 105" fill="none" stroke="#1565c0" stroke-dasharray="3 3" marker-end="url(#lc)"/>
+      <text x="430" y="128" font-size="10" fill="#1565c0">setState /</text>
+      <text x="430" y="140" font-size="10" fill="#1565c0">dep change</text>
+    </svg>
+    <figcaption>Fig 1 · Red = once, blue = repeatable, green = many. build re-runs on setState, parent rebuild, didUpdateWidget, and dependency changes</figcaption>
+  </figure>
+  <table>
+    <tr><th>#</th><th>Method</th><th>When</th><th>Frequency</th><th>Purpose</th></tr>
+    <tr><td>1</td><td><code>createState()</code></td><td>Widget first inserted</td><td class="once">once</td><td>Create the State object</td></tr>
+    <tr><td>2</td><td><code>initState()</code></td><td>After State created</td><td class="once">once</td><td>Set up: controllers, futures, subscriptions</td></tr>
+    <tr><td>3</td><td><code>didChangeDependencies()</code></td><td>After initState; when an inherited dep changes</td><td class="many">1+</td><td>React to InheritedWidget changes</td></tr>
+    <tr><td>4</td><td><code>build()</code></td><td>After #3, then on every re-render</td><td class="many">many</td><td>Return the widget subtree</td></tr>
+    <tr><td>5</td><td><code>didUpdateWidget(old)</code></td><td>Parent supplies new config of same type</td><td class="many">many</td><td>Compare old/new props; react to changes</td></tr>
+    <tr><td>6</td><td><code>setState(fn)</code></td><td>You call it</td><td class="many">as called</td><td>Mark dirty → schedule a build</td></tr>
+    <tr><td>7</td><td><code>deactivate()</code></td><td>Removed from tree, may be reinserted</td><td class="rare">rare</td><td>Detach links (GlobalKey moves)</td></tr>
+    <tr><td>8</td><td><code>dispose()</code></td><td>Permanently removed</td><td class="once">once</td><td>Cancel subscriptions, dispose controllers</td></tr>
+    <tr><td>9</td><td><code>reassemble()</code></td><td>Hot reload (dev only)</td><td class="rare">dev</td><td>Re-init things hot reload may reset</td></tr>
+    <tr><td>10</td><td><code>mounted</code> <em>(property)</em></td><td>true after initState, false after dispose</td><td>—</td><td>Guard async setState after dispose</td></tr>
+  </table>
+</section>
+
+<section id="initstate">
+  <span class="sec-num">Section 05</span>
+  <h2 class="sec">initState and dispose — the mirror pair</h2>
+  <p class="lead">Whatever you <strong>create</strong> in <code>initState</code>, you <strong>destroy</strong> in <code>dispose</code>. They are mirror images, and forgetting the second half is the most common Flutter memory leak.</p>
+  <div class="filelabel"><span class="fn">player_screen.dart</span><span class="where">_PlayerScreenState — create in initState, free in dispose</span></div>
+  <pre><code>@override
+<span class="tok-key">void</span> initState() {
+  super.initState();
+  _controller = AnimationController(vsync: <span class="tok-key">this</span>, duration: ...); <span class="tok-cmt">// created</span>
+  _sub = stream.listen(_onData);                                  <span class="tok-cmt">// subscribed</span>
+}
+
+@override
+<span class="tok-key">void</span> dispose() {
+  _controller.dispose();   <span class="tok-cmt">// freed</span>
+  _sub.cancel();           <span class="tok-cmt">// unsubscribed</span>
+  super.dispose();         <span class="tok-cmt">// always last</span>
+}</code></pre>
+  <div class="box warn"><span class="lab">Leak rule</span><p>A controller / subscription / listener created and never disposed keeps running (and holding memory) after the widget is gone. Every <code>initState</code> creation needs a matching <code>dispose</code> teardown. Note the ordering convention: <code>super.initState()</code> <em>first</em>, <code>super.dispose()</code> <em>last</em>.</p></div>
+  <div class="box win"><span class="lab">Why fetch in initState (not build)</span><p><code>initState</code> runs once; <code>build</code> runs many times. A Future or subscription created in <code>build</code> would be recreated on every rebuild. So one-time setup belongs in <code>initState</code>, and <code>build</code> only consumes what’s already there.</p></div>
+</section>
+
+<section id="didupdate">
+  <span class="sec-num">Section 06</span>
+  <h2 class="sec">didUpdateWidget — new config, same State</h2>
+  <p class="lead">When a parent rebuilds and passes a new widget of the <em>same type</em> into this spot, the State is <strong>reused</strong> — so <code>initState</code> does not run again. <code>didUpdateWidget</code> is how the State notices the new config.</p>
+  <p>The trap it prevents: anything you derived from a constructor field in <code>initState</code> goes <strong>stale</strong> when that field changes, because initState won’t re-run.</p>
+  <div class="filelabel"><span class="fn">detail_page.dart</span><span class="where">re-fetch when the productId actually changes</span></div>
+  <pre><code>@override
+<span class="tok-key">void</span> initState() {
+  super.initState();
+  _future = fetch(widget.productId);     <span class="tok-cmt">// handles the FIRST id</span>
+}
+
+@override
+<span class="tok-key">void</span> didUpdateWidget(DetailPage oldWidget) {
+  super.didUpdateWidget(oldWidget);
+  <span class="tok-key">if</span> (widget.productId != oldWidget.productId) { <span class="tok-cmt">// only when it really changed</span>
+    _future = fetch(widget.productId);            <span class="tok-cmt">// handles LATER changes</span>
+  }
+}</code></pre>
+  <p><span class="mantra">initState handles the first value; didUpdateWidget handles later changes to it.</span> The <code>oldWidget</code> argument lets you compare old-vs-new and act only on a real change.</p>
+  <div class="box win"><span class="lab">Riverpod often removes the need</span><p>If instead of storing a Future you <code>ref.watch(productProvider(widget.productId))</code>, Riverpod re-runs automatically when the id changes — no <code>didUpdateWidget</code> needed. The hook still matters for raw controllers/futures tied to a changing prop.</p></div>
+  <div class="teach"><span class="tag">Teach-back</span><ol><li>Why doesn’t <code>initState</code> re-run when a parent passes a new <code>productId</code> to the same widget — what survived, what was replaced?</li></ol></div>
+</section>
+
+<section id="didchange">
+  <span class="sec-num">Section 07</span>
+  <h2 class="sec">didChangeDependencies — when something above you changes</h2>
+  <p class="lead">Fires right after <code>initState</code> (always once), and again whenever an <strong>InheritedWidget</strong> this widget reads changes (theme, locale, MediaQuery, an injected dependency above you).</p>
+  <p>When you call <code>Theme.of(context)</code> or similar inside <code>build</code>, Flutter registers you as a <em>dependent</em> of that InheritedWidget. If it changes, Flutter notifies you via this method.</p>
+  <div class="filelabel"><span class="fn">greeting_screen.dart</span><span class="where">setup that depends on an inherited value</span></div>
+  <pre><code>@override
+<span class="tok-key">void</span> didChangeDependencies() {
+  super.didChangeDependencies();
+  <span class="tok-key">final</span> locale = Localizations.localeOf(context); <span class="tok-cmt">// inherited — safe to read HERE</span>
+  _loadGreetingFor(locale);                        <span class="tok-cmt">// re-runs if locale changes</span>
+}</code></pre>
+  <div class="box warn"><span class="lab">The gotcha it fixes</span><p>Do <strong>not</strong> read InheritedWidgets in <code>initState</code> — the context isn’t fully wired to them yet. If your setup needs an inherited value, do it in <code>didChangeDependencies</code> instead.</p></div>
+  <div class="box note"><span class="lab">didUpdateWidget vs didChangeDependencies</span><p><strong>didUpdateWidget</strong> = my <em>own</em> config (constructor props) changed. <strong>didChangeDependencies</strong> = a <em>shared thing above me</em> (InheritedWidget) changed. Different sources of change. In everyday code you’ll override didChangeDependencies rarely — most inherited reads sit in <code>build</code>, which already re-runs on change.</p></div>
+</section>
+
+<section id="rare">
+  <span class="sec-num">Section 08</span>
+  <h2 class="sec">deactivate and reassemble — the rare ones</h2>
+  <h3><code>deactivate()</code></h3>
+  <p>Fires when the State is removed from the tree but <em>might</em> be reinserted in the same frame — the classic case being a widget with a <code>GlobalKey</code> moved to a new position. It’s a “being detached” notice that comes just before <code>dispose</code>. If the widget is reinserted, it keeps living and <code>dispose</code> never runs; if not, <code>dispose</code> follows.</p>
+  <div class="box note"><span class="lab">Practical reality</span><p>You will almost never override <code>deactivate</code>. It exists for advanced subtree-moving via GlobalKey. Know it sits just before <code>dispose</code>; otherwise ignore it.</p></div>
+  <h3><code>reassemble()</code></h3>
+  <p>Development only — fires on <strong>hot reload</strong>, never in a released app. Useful to re-run setup that hot reload would otherwise leave stale (since hot reload re-runs <code>build</code> but <em>not</em> <code>initState</code>).</p>
+  <div class="box win"><span class="lab">In practice</span><p>Rarely overridden. If hot reload leaves something stale, most developers just hot <strong>restart</strong> (which re-runs <code>main</code> and <code>initState</code>) instead of writing <code>reassemble</code>.</p></div>
+</section>
+
+<section id="traps">
+  <span class="sec-num">Section 09</span>
+  <h2 class="sec">The two practical traps</h2>
+  <h3>1. The <code>mounted</code> guard — async after dispose</h3>
+  <p>If you <code>await</code> inside a callback, the widget may be removed from the tree before the await resolves. Calling <code>setState</code> then throws. <code>mounted</code> tells you whether the State is still in the tree.</p>
+  <div class="filelabel"><span class="fn">any State or callback</span><span class="where">guard before setState after an await</span></div>
+  <pre><code>onPressed: () <span class="tok-key">async</span> {
+  <span class="tok-key">final</span> data = <span class="tok-key">await</span> fetch();
+  <span class="tok-key">if</span> (!mounted) <span class="tok-key">return</span>;            <span class="tok-cmt">// disposed during the await → bail out</span>
+  setState(() =&gt; _data = data);
+}</code></pre>
+  <div class="box warn"><span class="lab">Why it crashes without the guard</span><p><code>mounted</code> is <code>true</code> after <code>initState</code> and <code>false</code> after <code>dispose</code>. Between an <code>await</code> starting and resolving, the user may navigate away — disposing the State. <code>setState</code> on a disposed State is an error. The guard makes the callback safe.</p></div>
+  <h3>2. The leak pair — create/destroy must match</h3>
+  <p>Repeating the mirror rule because it’s the other trap: every controller, subscription, or listener created in <code>initState</code> must be torn down in <code>dispose</code>. Unmatched creation = a leak that outlives the widget.</p>
+</section>
+
+<section id="consumer">
+  <span class="sec-num">Section 10</span>
+  <h2 class="sec">Consumer widgets and the lifecycle</h2>
+  <p class="lead">Riverpod’s widget types map cleanly onto the two you know — they just add a <code>ref</code>.</p>
+  <table>
+    <tr><th>Plain</th><th>Riverpod equivalent</th><th>Lifecycle</th></tr>
+    <tr><td><code>StatelessWidget</code></td><td><code>ConsumerWidget</code></td><td>None — <code>build(context, ref)</code> only</td></tr>
+    <tr><td><code>StatefulWidget</code></td><td><code>ConsumerStatefulWidget</code></td><td>Full lifecycle, and <code>ref</code> available in every method</td></tr>
+  </table>
+  <div class="filelabel"><span class="fn">detail_page.dart</span><span class="where">ConsumerStatefulWidget — ref + a controller together</span></div>
+  <pre><code><span class="tok-key">class</span> DetailPage <span class="tok-key">extends</span> ConsumerStatefulWidget { ... }
+
+<span class="tok-key">class</span> _DetailPageState <span class="tok-key">extends</span> ConsumerState&lt;DetailPage&gt; {
+  <span class="tok-key">late</span> <span class="tok-fn">ScrollController</span> _scroll;
+
+  @override
+  <span class="tok-key">void</span> initState() {
+    super.initState();
+    _scroll = ScrollController();   <span class="tok-cmt">// view-mechanics → setState/controller territory</span>
+  }
+
+  @override
+  <span class="tok-fn">Widget</span> build(BuildContext context) {
+    <span class="tok-key">final</span> productAsync = ref.watch(productProvider(widget.id)); <span class="tok-cmt">// ref works here too</span>
+    <span class="tok-key">return</span> ...;
+  }
+
+  @override
+  <span class="tok-key">void</span> dispose() { _scroll.dispose(); super.dispose(); }
+}</code></pre>
+  <div class="box key"><span class="lab">The division of labour</span><p><strong>Domain state</strong> (data, business logic) → a Riverpod Notifier (ViewModel), reached via <code>ref</code>. <strong>View-mechanics</strong> (scroll/animation/text controllers, ephemeral flags) → the State object via <code>initState</code>/<code>dispose</code>/<code>setState</code>. <code>ConsumerStatefulWidget</code> is precisely the type for a screen that needs both at once.</p></div>
+  <div class="teach"><span class="tag">Teach-back</span><ol>
+    <li>You need a Riverpod <code>ref</code> and a <code>TextEditingController</code> on the same screen. Which widget type, and where does each piece go?</li>
+  </ol></div>
+</section>
